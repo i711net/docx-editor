@@ -175,6 +175,55 @@ export async function importPresentationFromPptx(buffer: ArrayBuffer): Promise<P
       });
     }
 
+    // Tables: <p:graphicFrame> wrapping an <a:tbl> (a totally different XML
+    // shape from <p:sp>/<p:pic> — the graphicFrame carries its own <p:xfrm>
+    // for position/size directly, not nested inside an <p:spPr>).
+    const graphicFrames = Array.from(slideDoc.getElementsByTagName('p:graphicFrame'));
+    for (const gf of graphicFrames) {
+      const tbl = gf.getElementsByTagName('a:tbl')[0];
+      if (!tbl) continue;
+      const trs = Array.from(tbl.getElementsByTagName('a:tr'));
+      if (trs.length === 0) continue;
+
+      const rawCells = trs.map((tr) =>
+        Array.from(tr.getElementsByTagName('a:tc')).map((tc) => {
+          const paragraphs = Array.from(tc.getElementsByTagName('a:p'));
+          return paragraphs
+            .map((p) => Array.from(p.getElementsByTagName('a:t')).map((t) => t.textContent ?? '').join(''))
+            .join('\n')
+            .trim();
+        }),
+      );
+      // Merged cells can make rows uneven in the raw XML — pad short rows so
+      // our model's rectangular `cells` grid stays consistent.
+      const cols = Math.max(...rawCells.map((row) => row.length), 1);
+      const cells = rawCells.map((row) => {
+        const padded = [...row];
+        while (padded.length < cols) padded.push('');
+        return padded;
+      });
+
+      const xfrm = gf.getElementsByTagName('a:off')[0];
+      const extEl = gf.getElementsByTagName('a:ext')[0];
+      const x = xfrm ? emuToPx(Number(xfrm.getAttribute('x')), scale) : 100;
+      const y = xfrm ? emuToPx(Number(xfrm.getAttribute('y')), scale) : 100;
+      const w = extEl ? emuToPx(Number(extEl.getAttribute('cx')), scale) : 400;
+      const h = extEl ? emuToPx(Number(extEl.getAttribute('cy')), scale) : 200;
+
+      elements.push({
+        id: genId(),
+        type: 'table',
+        x,
+        y,
+        width: Math.max(w, 40),
+        height: Math.max(h, 40),
+        rows: cells.length,
+        cols,
+        cells,
+        fontSize: 14,
+      });
+    }
+
     // Slide background color (best-effort — only the simple solid-fill case).
     let background = '#FFFFFF';
     const bg = slideDoc.getElementsByTagName('p:bg')[0];

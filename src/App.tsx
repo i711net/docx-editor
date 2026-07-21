@@ -1,4 +1,4 @@
-import { useCallback, useRef, useState, type ReactNode } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import {
   DocxEditor,
   createEmptyDocument,
@@ -26,6 +26,10 @@ import { XlsxEditor, createBlankSheets } from './XlsxEditor';
 import { PptxEditor } from './PptxEditor';
 import { TxtEditor } from './TxtEditor';
 import { NewFileMenu, type NewFileKind } from './NewFileMenu';
+import { clearDraft, debounce, loadDraft, saveDraft, type DraftEnvelope } from './lib/autosave';
+import { DraftBanner } from './DraftBanner';
+
+const DOCX_AUTOSAVE_KIND = 'docx';
 
 const IMAGE_EXTENSIONS = ['.jpg', '.jpeg', '.png', '.gif', '.webp', '.bmp'];
 
@@ -86,6 +90,27 @@ function App() {
   const [pptxKey, setPptxKey] = useState(0);
   const [txtState, setTxtState] = useState<TxtState>({ text: '', fileName: '未命名文本.txt' });
   const [txtKey, setTxtKey] = useState(0);
+  const [docxDraft, setDocxDraft] = useState<DraftEnvelope<{ document: Document }> | null>(null);
+
+  useEffect(() => {
+    void loadDraft<{ document: Document }>(DOCX_AUTOSAVE_KIND).then(setDocxDraft);
+  }, []);
+
+  const debouncedDocxAutosave = useMemo(
+    () =>
+      debounce(
+        (doc: Document, name: string) => void saveDraft(DOCX_AUTOSAVE_KIND, { document: doc }, name),
+        1500,
+      ),
+    [],
+  );
+
+  const handleDocxChange = useCallback(
+    (doc: Document) => {
+      debouncedDocxAutosave(doc, documentName);
+    },
+    [debouncedDocxAutosave, documentName],
+  );
 
   // Called when the user chooses File > Save (or Ctrl/Cmd+S) inside the
   // editor. The library hands us the packaged .docx bytes; we just need to
@@ -106,8 +131,13 @@ function App() {
       link.click();
       link.remove();
       URL.revokeObjectURL(url);
+      // Cancel first — a keystroke-triggered autosave could already be
+      // queued and would otherwise fire moments later and re-write the
+      // draft we're about to clear.
+      debouncedDocxAutosave.cancel();
+      void clearDraft(DOCX_AUTOSAVE_KIND);
     },
-    [documentName],
+    [documentName, debouncedDocxAutosave],
   );
 
   const handleError = useCallback((error: Error) => {
@@ -371,27 +401,46 @@ function App() {
     );
   } else {
     body = (
-      <DocxEditor
-        key={editorKey}
-        ref={editorRef}
-        document={initialDocument}
-        documentName={documentName}
-        onDocumentNameChange={setDocumentName}
-        author={author}
-        onSave={handleSave}
-        onError={handleError}
-        i18n={zhCN}
-        colorMode="system"
-        showToolbar
-        showFileOpen
-        showZoomControl
-        showRuler
-        showOutline
-        showMarginGuides={false}
-        rulerUnit="cm"
-        mode="editing"
-        className="app-editor"
-      />
+      <div className="app-editor-wrap">
+        {docxDraft && (
+          <DraftBanner
+            savedAt={docxDraft.savedAt}
+            documentName={docxDraft.documentName}
+            onRestore={() => {
+              setInitialDocument(docxDraft.payload.document);
+              if (docxDraft.documentName) setDocumentName(docxDraft.documentName);
+              setEditorKey((k) => k + 1);
+              setDocxDraft(null);
+            }}
+            onDiscard={() => {
+              void clearDraft(DOCX_AUTOSAVE_KIND);
+              setDocxDraft(null);
+            }}
+          />
+        )}
+        <DocxEditor
+          key={editorKey}
+          ref={editorRef}
+          document={initialDocument}
+          documentName={documentName}
+          onDocumentNameChange={setDocumentName}
+          author={author}
+          onSave={handleSave}
+          onChange={handleDocxChange}
+          onError={handleError}
+          i18n={zhCN}
+          colorMode="system"
+          showToolbar
+          showFileOpen
+          showZoomControl
+          showRuler
+          showOutline
+          showMarginGuides={false}
+          rulerUnit="cm"
+          mode="editing"
+          className="app-editor"
+        />
+      </div>
     );
   }
 

@@ -249,3 +249,28 @@
   width: 100%;
   height: 100%;
 }
+
+.pptx-editor__theme-swatch {
+  border: 2px solid #ccc;
+  border-radius: 6px;
+  padding: 4px 10px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.pptx-editor__table-el {
+  width: 100%;
+  height: 100%;
+  border-collapse: collapse;
+  background: #fff;
+}
+
+.pptx-editor__table-el td {
+  border: 1px solid #ccc;
+  padding: 4px 8px;
+  vertical-align: top;
+  outline: none;
+  cursor: text;
+  min-width: 20px;
+}

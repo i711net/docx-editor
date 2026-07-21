@@ -2,17 +2,19 @@
 
 一个基于浏览器的 Office 兼容"阅读编辑器"：可以直接在网页里**新建、打开、编辑、保存** `.docx`（Word）、`.xlsx`（Excel）、`.pptx`（PPT）、`.txt` 文件，同时也能**读**多种其他常见文件格式（PDF、旧版 .doc、韩国 HWP、EPUB、图片），不需要任何后端服务器，适合部署为纯静态站点（Cloudflare Pages / Vercel / Netlify 均可）。
 
-定位：核心可编辑格式（docx / xlsx / pptx / txt）做到接近 Office 基础版的使用体验；其余格式（PDF/.doc/HWP/EPUB/图片）按各自的技术现实，能转成可编辑文档的转换成可编辑文档，转不了的至少提供高保真只读预览。目前的状态是——**.docx 原生完整编辑；.xlsx 原生表格编辑（公式、多工作表、常用格式）；.pptx 原生幻灯片编辑（文字/图片/形状、拖拽缩放）；.txt 独立纯文本编辑器；PDF/.doc/HWP/EPUB 可以"转换成可编辑文档"再编辑；图片可以直接插入文档；EPUB 还额外提供一个真正的分页阅读器（翻页、目录）**。
+定位：核心可编辑格式（docx / xlsx / pptx / txt）做到接近 Office 基础版的使用体验；其余格式（PDF/.doc/HWP/EPUB/图片）按各自的技术现实，能转成可编辑文档的转换成可编辑文档，转不了的至少提供高保真只读预览。目前的状态是——**.docx 原生完整编辑；.xlsx 原生表格编辑（公式、多工作表、常用格式、插入图表）；.pptx 原生幻灯片编辑（文字/图片/形状/表格、主题、切换效果与动画的应用内播放预览）；.txt 独立纯文本编辑器；docx/xlsx/pptx/txt 都带自动保存草稿；PDF/.doc/HWP/EPUB 可以"转换成可编辑文档"再编辑；图片可以直接插入文档；EPUB 还额外提供一个真正的分页阅读器（翻页、目录）**。
 
 工具栏左上角的"＋ 新建"按钮可以直接新建空白的 Word / Excel / PPT / TXT 文件（PDF、EPUB 不提供"新建空白"选项，原因见下方"打开其他格式"表格——这两种格式本身不适合"从空白开始编辑"）。
 
 **.docx** 支持：文字格式（字体/字号/颜色/高亮/加粗斜体下划线等）、对齐与段落样式、项目符号/编号列表、表格、图片、页眉页脚、批注（评论）、修订（Track Changes / 建议模式）、目录大纲、查找替换、打印、多语言界面（已启用简体中文）。界面基于开源项目 [`eigenpal/docx-editor`](https://github.com/eigenpal/docx-editor)（Apache-2.0 协议）的 `@eigenpal/docx-editor-react` 组件构建。
 
-**.xlsx** 支持：单元格编辑、常用格式（字体/颜色/边框/数字格式）、常用公式函数、多工作表、行列操作、真实 `.xlsx`/`.xls`/`.csv` 文件导入导出。基于 [`@fortune-sheet/react`](https://github.com/ruilisi/fortune-sheet)（Luckysheet 的活跃维护 fork，MIT 协议）+ [`@corbe30/fortune-excel`](https://www.npmjs.com/package/@corbe30/fortune-excel)（MIT 协议，负责与真实 xlsx 字节互转）。**不支持**：图表、数据透视表、条件格式（这些是"进阶版"功能，本项目按基础版定位有意不做）。
+**.xlsx** 支持：单元格编辑、常用格式（字体/颜色/边框/数字格式）、常用公式函数、多工作表、行列操作、**插入图表**（柱状图/折线图/饼图，见下方说明）、真实 `.xlsx`/`.xls`/`.csv` 文件导入导出。基于 [`@fortune-sheet/react`](https://github.com/ruilisi/fortune-sheet)（Luckysheet 的活跃维护 fork，MIT 协议）+ [`@corbe30/fortune-excel`](https://www.npmjs.com/package/@corbe30/fortune-excel)（MIT 协议，负责与真实 xlsx 字节互转）。**不支持**：数据透视表、条件格式（这些是"进阶版"功能，本项目按基础版定位有意不做）。
 
-**.pptx** 支持：新建/切换/删除幻灯片，插入文字框、图片、矩形/椭圆等简单形状，拖拽移动、四角缩放，文字加粗/斜体/下划线/字号/颜色/对齐，形状填充色，幻灯片背景色，真实 `.pptx` 文件导入导出。是本项目自研的编辑器（[`react-rnd`](https://www.npmjs.com/package/react-rnd) 做拖拽缩放 + [`pptxgenjs`](https://www.npmjs.com/package/pptxgenjs) 做导出 + 基于 `jszip` 手写的 OOXML 解析器做导入，均为 MIT 协议）。**不支持**：动画、幻灯片切换效果、母版/版式编辑（同样是基础版定位有意不做的进阶功能）。
+**.pptx** 支持：新建/切换/删除幻灯片，插入文字框、图片、矩形/椭圆等简单形状、**表格**，拖拽移动、四角缩放，文字加粗/斜体/下划线/字号/颜色/对齐，形状填充色，幻灯片背景色，**主题模板**（一键套用配色）、**幻灯片切换效果**与**元素进入动画**（在应用内"▶ 播放"预览里生效，见下方说明），真实 `.pptx` 文件导入导出（含表格）。是本项目自研的编辑器（[`react-rnd`](https://www.npmjs.com/package/react-rnd) 做拖拽缩放 + [`pptxgenjs`](https://www.npmjs.com/package/pptxgenjs) 做导出 + 基于 `jszip` 手写的 OOXML 解析器做导入，均为 MIT 协议）。**不支持**：母版/版式编辑、SmartArt（同样是基础版定位有意不做的进阶功能）。
 
 **.txt** 是一个独立的轻量纯文本编辑器（普通 `<textarea>`），新建/打开/编辑/保存都很直接。之所以没有像 PDF/.doc 那样"转换后导入 docx 编辑器编辑"，是因为实测发现 docx 编辑器组件内部的"保存"按钮会无条件额外触发一次它自己的下载（文件名固定为 `.docx`，且没有任何 prop 能关掉这个行为）——如果 txt 复用这个编辑器，每次保存都会静默多下载一个文件名错误的 `.docx`。为了保证"保存 = 生成且只生成这一个 .txt 文件"，txt 用了完全独立、只有一条保存路径的实现。
+
+**自动保存草稿**：docx/xlsx/pptx/txt 四个原生编辑器都会在你编辑时（停顿约 1.5 秒后）把当前内容自动快照到浏览器本地的 IndexedDB 里。如果标签页意外刷新、被关掉，或者浏览器崩溃，下次重新打开同一种编辑器时会看到一条黄色提示条，可以选择恢复或丢弃这份草稿。这纯粹是"防止手滑丢失工作"的安全网，不是版本历史——每种格式只保留最近一份草稿，点了"保存"之后这份草稿会被清除。全程只写在你自己浏览器本地，不涉及任何服务器。
 
 所有文档处理（docx/xlsx/pptx/txt 及其余各格式）都在浏览器本地完成，文件不会被上传到任何服务器。
 
@@ -28,8 +30,8 @@
 | **HWP / HWPX**（韩国"한글"文档） | 用 [`@rhwp/core`](https://github.com/edwardkim/rhwp)（MIT 协议，Rust+WASM）在浏览器本地渲染，可以**只读预览原始排版**（分页、缩放）；点击"转换为可编辑文档"可以把文字提取出来，导入到同一个 docx 编辑器里自由编辑。 | 预览是只读的——rhwp 底层其实有一套编辑 API，但那是面向程序调用的低层 API（按 section/段落/字符偏移量操作），不是一套现成的"点哪改哪"交互，要做成真正的所见即所得 HWP 编辑器是一个独立的大工程，这里没有做。如果你需要**保留原始 HWP 格式**编辑并存回 `.hwp`，作者本人做了一个更完整的方案 [`@rhwp/editor`](https://www.npmjs.com/package/@rhwp/editor)，但它是把一个完整的编辑器界面通过 iframe 嵌入进来，默认会连接到作者托管在 `edwardkim.github.io` 的页面（也可以自建替换 `studioUrl`）——考虑到隐私和"完全离线自包含"的定位，本项目默认没有接入这个，只用了纯本地运行的 `@rhwp/core`。 |
 | **EPUB**（电子书） | 用 [`epubjs`](https://github.com/futurepress/epub.js) + [`react-reader`](https://github.com/happyr/react-reader) 提供一个**真正的分页阅读器**（翻页、点目录跳章节），完全在浏览器本地解析，不连接任何外部服务；阅读之外也可以点"转换为可编辑文档"把全书文字按章节/段落提取出来导入 docx 编辑器。 | 阅读模式下是只读的（这本来就是电子书阅读器的正常形态，不是缺陷）；转换成可编辑文档后，原书的排版、字体、图片、章节分页信息都不会保留，只剩下文字内容按段落排列。 |
 | **TXT**（纯文本） | 直接在独立的纯文本编辑器（`TxtEditor`）里打开，**原样、可直接编辑**，保存下来就是一个干净的 `.txt`——不经过 docx 转换，所以也不存在段落切分误差。 | 纯文本本来就不含任何格式信息，没有"丢失格式"的问题；但如果原 txt 用了非 UTF-8 编码，浏览器按 UTF-8 解码可能会有乱码，建议先把源文件转成 UTF-8。 |
-| **Excel**（`.xlsx`/`.xls`/`.csv`） | 直接原生打开到表格编辑器里编辑，保存导出真实 `.xlsx`。 | 图表、数据透视表、条件格式不支持（基础版定位）；`.xls`（旧二进制格式）导入没问题，但保存统一另存为 `.xlsx`。 |
-| **PPT**（`.pptx`） | 直接原生打开到幻灯片编辑器里编辑（文字/图片/形状位置、颜色、字体），保存导出真实 `.pptx`。 | 动画、切换效果、复杂版式（SmartArt、母版自定义）目前解析时会被跳过，只保留文字/图片/基础形状，导入后原文件里的这部分视觉效果不会还原。 |
+| **Excel**（`.xlsx`/`.xls`/`.csv`） | 直接原生打开到表格编辑器里编辑，可以框选一个数据区域插入柱状图/折线图/饼图，保存导出真实 `.xlsx`。 | 插入的图表是**渲染好的静态图片**，不是可以双击改数据联动刷新的原生 Excel 图表对象（本项目的导出链路 `@corbe30/fortune-excel` + `exceljs` 没有写原生图表 XML 的能力——这和早前"PDF 转图片"选项是同一种"诚实地退而求其次"的取舍，见下方"已知坑"）；数据透视表、条件格式不支持（基础版定位）；`.xls`（旧二进制格式）导入没问题，但保存统一另存为 `.xlsx`。 |
+| **PPT**（`.pptx`） | 直接原生打开到幻灯片编辑器里编辑（文字/图片/形状/表格的位置、颜色、字体），保存导出真实 `.pptx`（含表格）。 | 幻灯片切换效果、元素进入动画只在本应用自己的"▶ 播放"预览模式里生效，**不会**写入导出的 `.pptx` 文件——用真实 PowerPoint/WPS 打开时，这些元素会原样静止显示（原因见下方"已知坑"）；复杂版式（SmartArt、母版自定义）解析时会被跳过，只保留文字/图片/基础形状/表格，导入后原文件里的这部分视觉效果不会还原。 |
 | **图片**（jpg/png/gif/webp/bmp） | 提供一个带缩放（放大/缩小/重置）的独立查看器；点"插入到新文档"会把图片整张嵌入一个新的 docx 文档里（用的是与 PDF-转图片相同的 `DocumentAgent.insertImage` 路径，已验证导出的 `.docx` 里 `word/media/` 包含正确的图片文件）。 | 目前是"整图插入新文档"，还没做"插入到当前正在编辑的文档光标位置"这种更细粒度的操作；也没有 OCR（图片文字识别），如果图片里是文字且需要变成可编辑文字，需要额外接入 OCR 服务，本项目没有做。 |
 
 也就是说：**.docx / .xlsx / .pptx / .txt 是原生完整编辑体验，PDF/.doc/HWP/EPUB 是"转换成可编辑文档"体验，图片是"插入"体验**——内容找回来了，但原始版式不是全部都能保留。这是经过调研后判断更现实、更诚实的方案，而不是画一个"什么都能编辑"的饼。
@@ -82,10 +84,12 @@ npx wrangler pages deploy dist --project-name=docx-editor
 ├── src/
 │   ├── main.tsx             # React 挂载入口
 │   ├── App.tsx               # 编辑器外壳：新建/打开文件路由、各编辑器之间的 mode 切换、"保存"下载逻辑
-│   ├── NewFileMenu.tsx / .css # 工具栏"＋ 新建"下拉菜单（docx/xlsx/pptx/txt）
+│   ├── NewFileMenu.tsx / .css # 工具栏"＋ 新建"下拉菜单（docx/xlsx/pptx/txt），下拉面板经 createPortal 挂到 document.body
+│   ├── DraftBanner.tsx / .css # 各编辑器共用的"检测到自动保存草稿，是否恢复"提示条
 │   ├── TxtEditor.tsx / .css   # 独立的纯文本编辑器（textarea，避开 docx 编辑器的双重下载问题）
-│   ├── XlsxEditor.tsx / .css  # Excel 表格编辑器（@fortune-sheet/react + @corbe30/fortune-excel）
-│   ├── PptxEditor.tsx / .css  # PPT 幻灯片编辑器（react-rnd + pptxgenjs + 自研 pptx 导入解析）
+│   ├── XlsxEditor.tsx / .css  # Excel 表格编辑器（@fortune-sheet/react + @corbe30/fortune-excel + 插入图表对话框）
+│   ├── PptxEditor.tsx / .css  # PPT 幻灯片编辑器（react-rnd + pptxgenjs + 自研 pptx 导入解析；表格/主题/切换效果/动画）
+│   ├── PptxPresentMode.tsx / .css # "▶ 播放"全屏预览：幻灯片切换动画 + 元素进入动画的实际播放逻辑
 │   ├── HwpViewer.tsx / .css   # HWP/HWPX 只读预览视图
 │   ├── EpubViewer.tsx / .css  # EPUB 分页阅读视图（react-reader）
 │   ├── ImageViewer.tsx / .css # 图片查看视图（缩放 + 插入到新文档）
@@ -98,9 +102,11 @@ npx wrangler pages deploy dist --project-name=docx-editor
 │   │   ├── hwp.ts                           # HWP/HWPX 解析、渲染、文字提取（@rhwp/core）
 │   │   ├── epubImport.ts                    # EPUB → 按章节/段落提取文字（epubjs）
 │   │   ├── imageFileImport.ts               # 读取图片文件为 dataURL + 原始像素尺寸
-│   │   ├── pptxModel.ts                     # PPT 编辑器内部数据模型（Presentation/Slide/SlideElement）
-│   │   ├── pptxExport.ts                    # 内部数据模型 → 真实 .pptx（pptxgenjs）
-│   │   └── pptxImport.ts                    # 真实 .pptx → 内部数据模型（jszip + DOMParser 手写 OOXML 解析）
+│   │   ├── pptxModel.ts                     # PPT 编辑器内部数据模型（Presentation/Slide/SlideElement，含表格/主题/切换/动画类型）
+│   │   ├── pptxExport.ts                    # 内部数据模型 → 真实 .pptx（pptxgenjs，含表格导出）
+│   │   ├── pptxImport.ts                    # 真实 .pptx → 内部数据模型（jszip + DOMParser 手写 OOXML 解析，含表格解析）
+│   │   ├── xlsxChart.ts                     # Excel 图表：区域解析（A1:C5）+ 数据提取 + Chart.js 渲染成 PNG
+│   │   └── autosave.ts                      # 自动保存草稿的读写（idb-keyval 封装 IndexedDB）+ 防抖工具
 │   ├── App.css / index.css
 ├── public/
 │   └── favicon.svg
@@ -131,6 +137,8 @@ npx wrangler pages deploy dist --project-name=docx-editor
 - [`pptxgenjs`](https://www.npmjs.com/package/pptxgenjs) — MIT License。
 - [`react-rnd`](https://www.npmjs.com/package/react-rnd) — MIT License。
 - [`jszip`](https://www.npmjs.com/package/jszip) — MIT/GPL 双协议，本项目按 MIT 条款使用。
+- [`chart.js`](https://www.npmjs.com/package/chart.js) — MIT License，用于 Excel 图表的离屏渲染。
+- [`idb-keyval`](https://www.npmjs.com/package/idb-keyval) — Apache License 2.0，自动保存草稿功能对 IndexedDB 的轻量封装。
 - 本仓库的胶水代码（`src/` 下的文件）同样以 Apache License 2.0 发布，见 `LICENSE`。
 
 ## 已知坑 / 排查笔记
@@ -144,4 +152,7 @@ npx wrangler pages deploy dist --project-name=docx-editor
 - **`.docx` 编辑器组件的"保存"会额外偷偷再下载一次**：实测发现 `@eigenpal/docx-editor-react` 内部的保存按钮，除了走本项目接的 `onSave` 回调之外，组件自己**还会**再执行一次它自己的 blob 下载，文件名固定为 `xxx.docx`（没有任何文档化的 prop 能关掉）。也就是说，**目前每次点 docx 的"保存"，浏览器实际上会弹出两次下载**——这是这次给 xlsx/pptx/txt 做端到端测试（第一次认真统计"总下载次数"而不是只看第一次下载）时才意外发现的一个预置问题，不是这次改动引入的。已确认的规避方法：txt 不复用这个组件，改用独立的 `TxtEditor`（见上文）。docx 本身这个问题目前**还没有修**，因为没有公开 API 能关闭组件的内部下载逻辑；如果你介意，一个可行方向是 fork 一份 `@eigenpal/docx-editor-react` 去掉那段硬编码逻辑，或者反馈给上游作者。
 - **PPT 导入解析是手写的 OOXML 子集解析器，不是完整的 pptx 规范实现**：`src/lib/pptxImport.ts` 只解析了 `<p:sp>`（文字）、`<p:pic>`（图片）和最基础的幻灯片背景色，读取真实第三方生成的复杂 pptx（尤其是用了 SmartArt、图表、动画、自定义母版的）时，这些元素会被直接跳过而不是报错——保留下来的文字和图片位置是准确的，但整体视觉效果不会 1:1 还原。
 - **Excel 里未修改过的单元格，重新导出后数字类型可能会变**：`@corbe30/fortune-excel` 在"读入 → 转成内部 sheet 数据 → 再导出"这个链路上，对于用户完全没碰过的原有单元格，实测个别情况下数字会从"数字类型"变成看起来一样但底层是"字符串"的值（Excel 里显示不出区别，但如果导出后的文件要给别的程序按数字类型读取，可能会有影响）。真正编辑过的单元格不受影响。这是第三方库的转换细节，不是本项目代码的问题，暂时按"基础版可用"验收。
+- **PPT 切换效果/元素动画为什么只是"应用内预览"，没有写进导出的 .pptx**：真实 PowerPoint 的动画/切换时序信息存在 OOXML 里一套很深、几乎没有文档的结构（`<p:timing>`、`<p:transition>`），而本项目的导出库 `pptxgenjs` 完全没有暴露写这部分 XML 的 API。手写这段 XML 风险很高（时序模型本身就复杂，写错了不是"效果不对"而是"文件可能打不开"），所以这里做的是一个诚实的取舍：切换效果/动画的设置照常保存在我们自己的数据模型里（`Slide.transition` / `SlideElement.animation`），点"▶ 播放"能在应用内看到真实的动画效果（`PptxPresentMode.tsx`），但导出成真实 `.pptx` 后，这些元素在 PowerPoint/WPS 里会原样静止显示——不是"没保存"，是"这一层信息目前没有安全的写入路径"。如果以后有余力啃 `<p:timing>` 这块，`pptxExport.ts` 是要改的地方。
+- **Excel 图表用的是 `updateSheet` + 手工构造的 `Image` 对象，不是 fortune-sheet 自带的图表 UI**：查过 `@fortune-sheet/react` 的类型定义和导出的组件列表，这个版本并没有像 Luckysheet 老版本那样自带一个"插入图表"的浮动 DOM 组件；同时 `exceljs`（`@corbe30/fortune-excel` 依赖的库）也没有 `addChart` 一类的 API。所以 `xlsxChart.ts` 走的是：读取所选区域数据 → 用 `chart.js` 在一个离屏 `<canvas>` 上画出图表 → 转成 PNG → 用 `workbookRef.current.updateSheet(...)` 把这张图片作为 `Sheet.images` 里的一个浮动图片对象插入（这个字段本来就是 fortune-sheet 用来承载"插入图片"功能的，插入图表只是复用了同一条路径）。已经过 Playwright + openpyxl 验证：插入的图表在应用内可拖拽/缩放，导出后 `xl/media/` 里能找到对应的真实图片文件，用 Excel/WPS 打开也能看到。局限就是上面表格里写的：这是一张画出来的图，不是能双击改数据的原生图表对象。
+- **`saveDraft`/`clearDraft` 之间有一个真实存在过的竞态，已经修**：自动保存草稿用的是"停止输入 1.5 秒后才真正写入 IndexedDB"的防抖策略；如果用户在防抖计时器还没触发前就点了"保存"，"保存"里的 `clearDraft` 会先执行，但那个已经排队的防抖写入依然会在几百毫秒后触发，把刚清掉的草稿又写回去——导致"明明点了保存，下次打开却还提示有草稿要恢复"。用 Playwright 端到端测试（保存后关闭编辑器再重新打开，检查草稿提示条是否还在）才捕捉到这个问题。修复方式是让 `debounce()`（`src/lib/autosave.ts`）返回的函数带一个 `.cancel()` 方法，四个编辑器的"保存"逻辑里都改成先调用 `debouncedAutosave.cancel()` 再调用 `clearDraft`，避免那个排队中的写入在清除之后又抢跑一次。
 - **测试用的 EPUB 标题乱码是 fixture 生成问题，不是本项目的 bug**：本仓库用 `pandoc` 在沙箱里生成过测试用的 `.epub`（真实用户文件不会有这个问题）。发现标题页文字（`title_page.xhtml` 里的 `<title>`/`<h1>`）会变成 `����...` 乱码，但用 `unzip` 解压检查后确认：不是本项目读取/渲染出的问题，而是 `pandoc` 在这个沙箱环境的 locale 设置下生成 epub 元数据（`title`/`author`）时，写入文件的字节本身就已经损坏了；同一份 epub 里正文章节（`ch001.xhtml` 等）的中文内容完全正常，恰好印证了问题出在 pandoc 的标题页生成路径，而不是本项目的解析/渲染逻辑。用真实电子书文件测试不会遇到这个问题。

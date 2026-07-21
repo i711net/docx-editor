@@ -1,4 +1,6 @@
-import { useCallback, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { clearDraft, debounce, loadDraft, saveDraft, type DraftEnvelope } from './lib/autosave';
+import { DraftBanner } from './DraftBanner';
 import './TxtEditor.css';
 
 interface TxtEditorProps {
@@ -7,6 +9,8 @@ interface TxtEditorProps {
   onDocumentNameChange: (name: string) => void;
   onBack: () => void;
 }
+
+const AUTOSAVE_KIND = 'txt';
 
 /**
  * Plain-text editor for .txt files. Deliberately NOT built on top of the
@@ -21,7 +25,21 @@ interface TxtEditorProps {
 export function TxtEditor({ initialText, documentName, onDocumentNameChange, onBack }: TxtEditorProps) {
   const [text, setText] = useState(initialText);
   const [nameDraft, setNameDraft] = useState(documentName);
+  const [draft, setDraft] = useState<DraftEnvelope<{ text: string }> | null>(null);
   const importInputRef = useRef<HTMLInputElement>(null);
+
+  const debouncedAutosave = useMemo(
+    () => debounce((value: string, fileName: string) => void saveDraft(AUTOSAVE_KIND, { text: value }, fileName), 1500),
+    [],
+  );
+
+  useEffect(() => {
+    void loadDraft<{ text: string }>(AUTOSAVE_KIND).then(setDraft);
+  }, []);
+
+  useEffect(() => {
+    debouncedAutosave(text, nameDraft);
+  }, [text, nameDraft, debouncedAutosave]);
 
   const handleSave = useCallback(() => {
     const trimmed = nameDraft.trim() || '未命名文本';
@@ -35,7 +53,12 @@ export function TxtEditor({ initialText, documentName, onDocumentNameChange, onB
     link.click();
     link.remove();
     URL.revokeObjectURL(url);
-  }, [text, nameDraft]);
+    // Cancel first — a keystroke-triggered autosave could already be queued
+    // and would otherwise fire moments later and re-write the draft we're
+    // about to clear.
+    debouncedAutosave.cancel();
+    void clearDraft(AUTOSAVE_KIND);
+  }, [text, nameDraft, debouncedAutosave]);
 
   const handleImportFile = useCallback(
     async (file: File) => {
@@ -60,6 +83,24 @@ export function TxtEditor({ initialText, documentName, onDocumentNameChange, onB
           if (file) void handleImportFile(file);
         }}
       />
+      {draft && (
+        <DraftBanner
+          savedAt={draft.savedAt}
+          documentName={draft.documentName}
+          onRestore={() => {
+            setText(draft.payload.text);
+            if (draft.documentName) {
+              setNameDraft(draft.documentName);
+              onDocumentNameChange(draft.documentName);
+            }
+            setDraft(null);
+          }}
+          onDiscard={() => {
+            void clearDraft(AUTOSAVE_KIND);
+            setDraft(null);
+          }}
+        />
+      )}
       <div className="txt-editor__bar">
         <button type="button" className="txt-editor__btn" onClick={onBack}>
           ← 返回

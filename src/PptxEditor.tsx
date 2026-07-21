@@ -1,19 +1,28 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Rnd } from 'react-rnd';
 import {
+  PPTX_THEMES,
   SLIDE_HEIGHT_PX,
   SLIDE_WIDTH_PX,
   createBlankSlide,
   createImageElement,
   createShapeElement,
+  createTableElement,
   createTextElement,
+  type AnimationType,
   type Presentation,
+  type PptxTheme,
   type Slide,
   type SlideElement,
+  type TableSlideElement,
   type TextSlideElement,
+  type TransitionType,
 } from './lib/pptxModel';
 import { exportPresentationToPptx } from './lib/pptxExport';
 import { importPresentationFromPptx } from './lib/pptxImport';
+import { PptxPresentMode } from './PptxPresentMode';
+import { clearDraft, debounce, loadDraft, saveDraft, type DraftEnvelope } from './lib/autosave';
+import { DraftBanner } from './DraftBanner';
 import './PptxEditor.css';
 
 interface PptxEditorProps {
@@ -28,6 +37,22 @@ interface PptxEditorProps {
 
 const THEME_COLORS = ['#FFFFFF', '#F5F5F0', '#0F172A', '#1E3A8A', '#166534', '#7C2D12', '#4C1D95'];
 const SHAPE_COLORS = ['#2563EB', '#DC2626', '#16A34A', '#D97706', '#7C3AED', '#111827'];
+const ANIMATION_OPTIONS: { value: AnimationType; label: string }[] = [
+  { value: 'none', label: '无动画' },
+  { value: 'fadeIn', label: '淡入' },
+  { value: 'flyInLeft', label: '左侧飞入' },
+  { value: 'flyInRight', label: '右侧飞入' },
+  { value: 'zoomIn', label: '缩放进入' },
+];
+const TRANSITION_OPTIONS: { value: TransitionType; label: string }[] = [
+  { value: 'none', label: '无切换效果' },
+  { value: 'fade', label: '淡入淡出' },
+  { value: 'push', label: '推入' },
+  { value: 'wipe', label: '擦除' },
+  { value: 'dissolve', label: '溶解' },
+];
+
+const AUTOSAVE_KIND = 'pptx';
 
 export function PptxEditor({
   initialPresentation,
@@ -40,9 +65,13 @@ export function PptxEditor({
   const [activeIndex, setActiveIndex] = useState(0);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [editingCell, setEditingCell] = useState<string | null>(null);
   const [nameDraft, setNameDraft] = useState(documentName);
   const [busy, setBusy] = useState<string | null>(null);
   const [scale, setScale] = useState(1);
+  const [presenting, setPresenting] = useState(false);
+  const [lastTheme, setLastTheme] = useState<PptxTheme | null>(null);
+  const [draft, setDraft] = useState<DraftEnvelope<{ presentation: Presentation }> | null>(null);
 
   const canvasWrapRef = useRef<HTMLDivElement>(null);
   const imageInputRef = useRef<HTMLInputElement>(null);
@@ -60,6 +89,21 @@ export function PptxEditor({
     ro.observe(el);
     return () => ro.disconnect();
   }, []);
+
+  const debouncedAutosave = useMemo(
+    () => debounce((value: Presentation, fileName: string) => void saveDraft(AUTOSAVE_KIND, { presentation: value }, fileName), 1500),
+    [],
+  );
+
+  useEffect(() => {
+    if (pendingImportFile) return;
+    void loadDraft<{ presentation: Presentation }>(AUTOSAVE_KIND).then(setDraft);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  useEffect(() => {
+    debouncedAutosave(presentation, nameDraft);
+  }, [presentation, nameDraft, debouncedAutosave]);
 
   const activeSlide: Slide | undefined = presentation.slides[activeIndex];
 
@@ -110,11 +154,15 @@ export function PptxEditor({
     [updateActiveSlide],
   );
 
-  const handleAddText = useCallback(() => addElement(createTextElement()), [addElement]);
+  const handleAddText = useCallback(
+    () => addElement(createTextElement(lastTheme ? { color: lastTheme.bodyColor } : {})),
+    [addElement, lastTheme],
+  );
   const handleAddShape = useCallback(
     (kind: 'rect' | 'ellipse') => addElement(createShapeElement(kind)),
     [addElement],
   );
+  const handleAddTable = useCallback(() => addElement(createTableElement(3, 3)), [addElement]);
 
   const handleAddImageFile = useCallback(
     (file: File) => {
@@ -140,11 +188,12 @@ export function PptxEditor({
     updateActiveSlide((slide) => ({ ...slide, elements: slide.elements.filter((el) => el.id !== selectedId) }));
     setSelectedId(null);
     setEditingId(null);
+    setEditingCell(null);
   }, [selectedId, updateActiveSlide]);
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (!selectedId || editingId) return;
+      if (!selectedId || editingId || editingCell) return;
       if (e.key === 'Delete' || e.key === 'Backspace') {
         const active = document.activeElement;
         if (active && (active.tagName === 'INPUT' || active.tagName === 'TEXTAREA')) return;
@@ -154,7 +203,7 @@ export function PptxEditor({
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [selectedId, editingId, handleDeleteSelected]);
+  }, [selectedId, editingId, editingCell, handleDeleteSelected]);
 
   const handleAddSlide = useCallback(() => {
     setPresentation((prev) => {
@@ -197,6 +246,25 @@ export function PptxEditor({
     [updateActiveSlide],
   );
 
+  const handleSetTransition = useCallback(
+    (transition: TransitionType) => {
+      updateActiveSlide((slide) => ({ ...slide, transition }));
+    },
+    [updateActiveSlide],
+  );
+
+  const handleApplyTheme = useCallback((theme: PptxTheme) => {
+    // A "theme" here only sets every slide's background plus the default
+    // color new text boxes get from now on — it deliberately never touches
+    // colors already set on existing text, so applying one can't silently
+    // undo formatting the user did by hand.
+    setPresentation((prev) => ({
+      ...prev,
+      slides: prev.slides.map((s) => ({ ...s, background: theme.background })),
+    }));
+    setLastTheme(theme);
+  }, []);
+
   const handleSave = useCallback(async () => {
     setBusy('正在生成 .pptx 文件…');
     try {
@@ -213,13 +281,18 @@ export function PptxEditor({
       link.click();
       link.remove();
       URL.revokeObjectURL(url);
+      // Cancel first — a keystroke-triggered autosave could already be
+      // queued and would otherwise fire moments later and re-write the
+      // draft we're about to clear.
+      debouncedAutosave.cancel();
+      void clearDraft(AUTOSAVE_KIND);
     } catch (err) {
       console.error(err);
       window.alert(`保存失败：${err instanceof Error ? err.message : String(err)}`);
     } finally {
       setBusy(null);
     }
-  }, [presentation, nameDraft]);
+  }, [presentation, nameDraft, debouncedAutosave]);
 
   const handleImportPptx = useCallback(
     async (file: File) => {
@@ -259,6 +332,54 @@ export function PptxEditor({
     [selectedId, selectedElement, updateElement],
   );
 
+  const updateTableCell = useCallback(
+    (elId: string, r: number, c: number, value: string) => {
+      updateActiveSlide((slide) => ({
+        ...slide,
+        elements: slide.elements.map((el) => {
+          if (el.id !== elId || el.type !== 'table') return el;
+          const cells = el.cells.map((row, ri) => (ri === r ? row.map((cell, ci) => (ci === c ? value : cell)) : row));
+          return { ...el, cells };
+        }),
+      }));
+    },
+    [updateActiveSlide],
+  );
+
+  const patchSelectedTable = useCallback(
+    (patch: Partial<TableSlideElement>) => {
+      if (!selectedId || selectedElement?.type !== 'table') return;
+      updateElement(selectedId, patch);
+    },
+    [selectedId, selectedElement, updateElement],
+  );
+
+  const addTableRow = useCallback(() => {
+    if (selectedElement?.type !== 'table') return;
+    patchSelectedTable({
+      rows: selectedElement.rows + 1,
+      cells: [...selectedElement.cells, Array.from({ length: selectedElement.cols }, () => '')],
+    });
+  }, [selectedElement, patchSelectedTable]);
+
+  const removeTableRow = useCallback(() => {
+    if (selectedElement?.type !== 'table' || selectedElement.rows <= 1) return;
+    patchSelectedTable({ rows: selectedElement.rows - 1, cells: selectedElement.cells.slice(0, -1) });
+  }, [selectedElement, patchSelectedTable]);
+
+  const addTableCol = useCallback(() => {
+    if (selectedElement?.type !== 'table') return;
+    patchSelectedTable({
+      cols: selectedElement.cols + 1,
+      cells: selectedElement.cells.map((row) => [...row, '']),
+    });
+  }, [selectedElement, patchSelectedTable]);
+
+  const removeTableCol = useCallback(() => {
+    if (selectedElement?.type !== 'table' || selectedElement.cols <= 1) return;
+    patchSelectedTable({ cols: selectedElement.cols - 1, cells: selectedElement.cells.map((row) => row.slice(0, -1)) });
+  }, [selectedElement, patchSelectedTable]);
+
   return (
     <div className="pptx-editor">
       <input
@@ -283,6 +404,26 @@ export function PptxEditor({
           if (file) void handleImportPptx(file);
         }}
       />
+      {draft && (
+        <DraftBanner
+          savedAt={draft.savedAt}
+          documentName={draft.documentName}
+          onRestore={() => {
+            setPresentation(draft.payload.presentation);
+            setActiveIndex(0);
+            setSelectedId(null);
+            if (draft.documentName) {
+              setNameDraft(draft.documentName);
+              onDocumentNameChange(draft.documentName);
+            }
+            setDraft(null);
+          }}
+          onDiscard={() => {
+            void clearDraft(AUTOSAVE_KIND);
+            setDraft(null);
+          }}
+        />
+      )}
       <div className="pptx-editor__bar">
         <button type="button" className="pptx-editor__btn" onClick={onBack}>
           ← 返回
@@ -307,6 +448,9 @@ export function PptxEditor({
         </button>
         <button type="button" className="pptx-editor__btn" onClick={() => handleAddShape('ellipse')}>
           插入椭圆
+        </button>
+        <button type="button" className="pptx-editor__btn" onClick={handleAddTable}>
+          插入表格
         </button>
         {selectedElement?.type === 'shape' && (
           <div className="pptx-editor__swatches">
@@ -374,6 +518,40 @@ export function PptxEditor({
             </select>
           </>
         )}
+        {selectedElement?.type === 'table' && (
+          <>
+            <span className="pptx-editor__divider" />
+            <button type="button" className="pptx-editor__btn" onClick={addTableRow}>
+              ＋行
+            </button>
+            <button type="button" className="pptx-editor__btn" onClick={removeTableRow}>
+              －行
+            </button>
+            <button type="button" className="pptx-editor__btn" onClick={addTableCol}>
+              ＋列
+            </button>
+            <button type="button" className="pptx-editor__btn" onClick={removeTableCol}>
+              －列
+            </button>
+          </>
+        )}
+        {selectedElement && (
+          <>
+            <span className="pptx-editor__divider" />
+            <select
+              className="pptx-editor__select"
+              value={selectedElement.animation ?? 'none'}
+              onChange={(e) => updateElement(selectedElement.id, { animation: e.target.value as AnimationType })}
+              title="播放时该元素的进入动画（仅在本应用的“播放”预览中生效，不会写入导出的 .pptx）"
+            >
+              {ANIMATION_OPTIONS.map((opt) => (
+                <option key={opt.value} value={opt.value}>
+                  动画：{opt.label}
+                </option>
+              ))}
+            </select>
+          </>
+        )}
         <span className="pptx-editor__spacer" />
         {selectedId && (
           <button type="button" className="pptx-editor__btn" onClick={handleDeleteSelected}>
@@ -382,6 +560,9 @@ export function PptxEditor({
         )}
         <button type="button" className="pptx-editor__btn" onClick={() => importInputRef.current?.click()}>
           打开 PPTX
+        </button>
+        <button type="button" className="pptx-editor__btn" onClick={() => setPresenting(true)}>
+          ▶ 播放
         </button>
         <button type="button" className="pptx-editor__btn pptx-editor__btn--primary" onClick={() => void handleSave()}>
           保存为 .pptx
@@ -430,6 +611,20 @@ export function PptxEditor({
 
         <div className="pptx-editor__canvas-area">
           <div className="pptx-editor__swatches pptx-editor__bg-swatches">
+            <span>主题：</span>
+            {PPTX_THEMES.map((theme) => (
+              <button
+                key={theme.id}
+                className="pptx-editor__theme-swatch"
+                style={{ background: theme.background, color: theme.titleColor, borderColor: theme.titleColor }}
+                onClick={() => handleApplyTheme(theme)}
+                title={`${theme.name}（应用到全部幻灯片）`}
+              >
+                {theme.name}
+              </button>
+            ))}
+          </div>
+          <div className="pptx-editor__swatches pptx-editor__bg-swatches">
             <span>背景：</span>
             {THEME_COLORS.map((c) => (
               <button
@@ -440,6 +635,20 @@ export function PptxEditor({
                 title={c}
               />
             ))}
+            <span className="pptx-editor__divider" />
+            <span>切换效果：</span>
+            <select
+              className="pptx-editor__select"
+              value={activeSlide?.transition ?? 'none'}
+              onChange={(e) => handleSetTransition(e.target.value as TransitionType)}
+              title="翻到这一页时的过渡效果（仅在本应用的“播放”预览中生效，不会写入导出的 .pptx）"
+            >
+              {TRANSITION_OPTIONS.map((opt) => (
+                <option key={opt.value} value={opt.value}>
+                  {opt.label}
+                </option>
+              ))}
+            </select>
           </div>
           <div className="pptx-editor__canvas-wrap" ref={canvasWrapRef}>
             <div
@@ -454,17 +663,20 @@ export function PptxEditor({
                 if (e.target === e.currentTarget) {
                   setSelectedId(null);
                   setEditingId(null);
+                  setEditingCell(null);
                 }
               }}
             >
-              {activeSlide?.elements.map((el) => (
+              {activeSlide?.elements.map((el) => {
+                const isEditingThisTable = el.type === 'table' && editingCell?.startsWith(`${el.id}:`);
+                return (
                 <Rnd
                   key={el.id}
                   size={{ width: el.width, height: el.height }}
                   position={{ x: el.x, y: el.y }}
                   scale={scale}
-                  disableDragging={editingId === el.id}
-                  enableResizing={editingId !== el.id}
+                  disableDragging={editingId === el.id || isEditingThisTable}
+                  enableResizing={editingId !== el.id && !isEditingThisTable}
                   onDragStop={(_e, d) => updateElement(el.id, { x: d.x, y: d.y })}
                   onResizeStop={(_e, _dir, ref, _delta, pos) =>
                     updateElement(el.id, {
@@ -548,8 +760,59 @@ export function PptxEditor({
                       }}
                     />
                   )}
+                  {el.type === 'table' && (
+                    <table className="pptx-editor__table-el" style={{ fontSize: el.fontSize }}>
+                      <tbody>
+                        {el.cells.map((row, r) => (
+                          <tr key={r}>
+                            {row.map((cellText, c) => {
+                              const cellKey = `${el.id}:${r}:${c}`;
+                              const isEditingCell = editingCell === cellKey;
+                              return (
+                                <td
+                                  key={c}
+                                  contentEditable={isEditingCell}
+                                  suppressContentEditableWarning
+                                  ref={(node) => {
+                                    // Same fix as the text-box editor above:
+                                    // seed + focus imperatively on entering
+                                    // edit mode, and only bind `children`
+                                    // while NOT editing (see below) so React
+                                    // doesn't fight the caret position on
+                                    // every keystroke.
+                                    if (node && isEditingCell && document.activeElement !== node) {
+                                      node.textContent = cellText;
+                                      node.focus();
+                                      const range = document.createRange();
+                                      range.selectNodeContents(node);
+                                      const sel = window.getSelection();
+                                      sel?.removeAllRanges();
+                                      sel?.addRange(range);
+                                    }
+                                  }}
+                                  onDoubleClick={(e) => {
+                                    e.stopPropagation();
+                                    setEditingCell(cellKey);
+                                  }}
+                                  onMouseDown={(e) => {
+                                    if (isEditingCell) e.stopPropagation();
+                                  }}
+                                  onInput={(e) => {
+                                    updateTableCell(el.id, r, c, e.currentTarget.textContent ?? '');
+                                  }}
+                                  onBlur={() => setEditingCell(null)}
+                                >
+                                  {isEditingCell ? undefined : cellText}
+                                </td>
+                              );
+                            })}
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  )}
                 </Rnd>
-              ))}
+              );})}
             </div>
           </div>
         </div>
@@ -559,6 +822,9 @@ export function PptxEditor({
         <div className="busy-overlay">
           <div className="busy-overlay__box">{busy}</div>
         </div>
+      )}
+      {presenting && activeSlide && (
+        <PptxPresentMode presentation={presentation} startIndex={activeIndex} onExit={() => setPresenting(false)} />
       )}
     </div>
   );

@@ -29,7 +29,15 @@
   overflow: hidden;
 }
 
+.app-editor-wrap {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
 .app-editor {
+  flex: 1 1 auto;
+  min-height: 0;
   height: 100%;
 }
 

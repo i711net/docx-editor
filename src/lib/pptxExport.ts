@@ -41,6 +41,16 @@ export async function exportPresentationToPptx(presentation: Presentation): Prom
           ...pos,
           fill: { color: el.fill.replace('#', '') },
         });
+      } else if (el.type === 'table') {
+        const rows = el.cells.map((row) =>
+          row.map((text) => ({ text, options: { fontSize: el.fontSize } })),
+        );
+        s.addTable(rows, {
+          ...pos,
+          fontSize: el.fontSize,
+          border: { type: 'solid', color: 'CCCCCC', pt: 1 },
+          autoPage: false,
+        });
       }
     }
   }
