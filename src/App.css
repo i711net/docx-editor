@@ -1,0 +1,9 @@
+.app-shell {
+  width: 100%;
+  height: 100vh;
+  overflow: hidden;
+}
+
+.app-editor {
+  height: 100%;
+}

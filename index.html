@@ -1,0 +1,59 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>在线文档编辑器</title>
+    <meta name="description" content="基于浏览器的 Word/WPS 兼容文档编辑器，支持表格、图片、批注、修订，直接读写 .docx 文件，全部在本地运行。" />
+
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <!-- 工具栏图标使用 Material Symbols 字体，提前加载避免图标闪烁 -->
+    <link
+      rel="stylesheet"
+      href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200&display=block"
+    />
+
+    <style>
+      .material-symbols-outlined {
+        font-family: 'Material Symbols Outlined';
+        font-weight: normal;
+        font-style: normal;
+        line-height: 1;
+        letter-spacing: normal;
+        text-transform: none;
+        display: inline-block;
+        white-space: nowrap;
+        word-wrap: normal;
+        direction: ltr;
+        -webkit-font-feature-settings: 'liga';
+        -webkit-font-smoothing: antialiased;
+        visibility: hidden;
+      }
+      .fonts-loaded .material-symbols-outlined {
+        visibility: visible;
+      }
+    </style>
+    <script>
+      if (document.fonts) {
+        document.fonts.ready.then(function () {
+          document.documentElement.classList.add('fonts-loaded');
+        });
+        document.fonts
+          .load('24px "Material Symbols Outlined"')
+          .then(function () {
+            document.documentElement.classList.add('fonts-loaded');
+          });
+      } else {
+        setTimeout(function () {
+          document.documentElement.classList.add('fonts-loaded');
+        }, 500);
+      }
+    </script>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>
