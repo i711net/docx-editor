@@ -13,8 +13,11 @@
     "@eigenpal/docx-editor-core": "^1.9.0",
     "@eigenpal/docx-editor-i18n": "^1.9.0",
     "@eigenpal/docx-editor-react": "^1.9.0",
+    "@rhwp/core": "^0.7.19",
+    "pdfjs-dist": "^4.10.38",
     "react": "^19.2.7",
-    "react-dom": "^19.2.7"
+    "react-dom": "^19.2.7",
+    "word-extractor": "^1.0.4"
   },
   "devDependencies": {
     "@types/node": "^24.13.2",
@@ -23,6 +26,7 @@
     "@vitejs/plugin-react": "^6.0.3",
     "oxlint": "^1.71.0",
     "typescript": "~6.0.2",
-    "vite": "^8.1.1"
+    "vite": "^8.1.1",
+    "vite-plugin-node-polyfills": "^0.28.0"
   }
 }

@@ -1,0 +1,98 @@
+.hwp-viewer {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  background: #f5f5f5;
+}
+
+.hwp-viewer__bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  background: #fff;
+  border-bottom: 1px solid #e0e0e0;
+  flex-wrap: wrap;
+}
+
+.hwp-viewer__filename {
+  font-weight: 600;
+  max-width: 240px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.hwp-viewer__spacer {
+  flex: 1 1 auto;
+}
+
+.hwp-viewer__btn {
+  border: 1px solid #d0d0d0;
+  background: #fff;
+  border-radius: 6px;
+  padding: 6px 12px;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.hwp-viewer__btn:hover:not(:disabled) {
+  background: #f0f0f0;
+}
+
+.hwp-viewer__btn:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.hwp-viewer__btn--primary {
+  background: #2563eb;
+  border-color: #2563eb;
+  color: #fff;
+}
+
+.hwp-viewer__btn--primary:hover {
+  background: #1d4ed8;
+}
+
+.hwp-viewer__page-indicator,
+.hwp-viewer__zoom-indicator {
+  font-size: 13px;
+  color: #444;
+  min-width: 64px;
+  text-align: center;
+}
+
+.hwp-viewer__hint {
+  margin: 0;
+  padding: 8px 16px;
+  font-size: 12.5px;
+  line-height: 1.6;
+  color: #665;
+  background: #fff8e1;
+  border-bottom: 1px solid #f0e0a0;
+}
+
+.hwp-viewer__error {
+  margin: 8px 16px;
+  color: #b91c1c;
+}
+
+.hwp-viewer__page-scroll {
+  flex: 1 1 auto;
+  overflow: auto;
+  display: flex;
+  justify-content: center;
+  padding: 24px;
+}
+
+.hwp-viewer__page {
+  background: #fff;
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.15);
+  transform-origin: top center;
+  height: fit-content;
+}
+
+.hwp-viewer__page svg {
+  display: block;
+}
