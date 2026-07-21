@@ -1,4 +1,4 @@
-import { useCallback, useRef, useState } from 'react';
+import { useCallback, useRef, useState, type ReactNode } from 'react';
 import {
   DocxEditor,
   createEmptyDocument,
@@ -303,99 +303,74 @@ function App() {
     }
   }, []);
 
+  // Which editor/viewer fills the body below the top bar, based on `mode`.
+  // Pulled out into a plain variable (rather than the old per-mode early
+  // `return`s) so that the "＋ 新建" / "打开…" top bar below can be rendered
+  // exactly once, above every mode — see the comment on `.app-topbar` for why
+  // this matters.
+  let body: ReactNode;
   if (mode === 'txt-edit') {
-    return (
-      <div className="app-shell">
-        <TxtEditor
-          key={txtKey}
-          initialText={txtState.text}
-          documentName={documentName}
-          onDocumentNameChange={setDocumentName}
-          onBack={() => setMode('docx')}
-        />
-      </div>
-    );
-  }
-
-  if (mode === 'xlsx') {
-    return (
-      <div className="app-shell">
-        <XlsxEditor
-          key={xlsxKey}
-          initialSheets={xlsxSheets}
-          pendingImportFile={xlsxPendingFile}
-          documentName={documentName}
-          onDocumentNameChange={setDocumentName}
-          onBack={() => setMode('docx')}
-        />
-      </div>
-    );
-  }
-
-  if (mode === 'pptx') {
-    return (
-      <div className="app-shell">
-        <PptxEditor
-          key={pptxKey}
-          initialPresentation={pptxPresentation}
-          pendingImportFile={pptxPendingFile}
-          documentName={documentName}
-          onDocumentNameChange={setDocumentName}
-          onBack={() => setMode('docx')}
-        />
-      </div>
-    );
-  }
-
-  if (mode === 'hwp-view' && hwpState) {
-    return (
-      <div className="app-shell">
-        <HwpViewer
-          doc={hwpState.doc}
-          fileName={hwpState.fileName}
-          onBack={() => setMode('docx')}
-          onConvertToEditable={() => void handleConvertHwpToEditable()}
-        />
-      </div>
-    );
-  }
-
-  if (mode === 'epub-view' && epubState) {
-    return (
-      <div className="app-shell">
-        <EpubViewer
-          buffer={epubState.buffer}
-          fileName={epubState.fileName}
-          onBack={() => setMode('docx')}
-          onConvertToEditable={() => void handleConvertEpubToEditable()}
-          converting={epubConverting}
-        />
-      </div>
-    );
-  }
-
-  if (mode === 'image-view' && imageState) {
-    return (
-      <div className="app-shell">
-        <ImageViewer
-          dataUrl={imageState.dataUrl}
-          fileName={imageState.fileName}
-          onBack={() => setMode('docx')}
-          onInsertIntoDocument={handleInsertImageIntoDocument}
-        />
-      </div>
-    );
-  }
-
-  return (
-    <div className="app-shell">
-      <input
-        ref={fileInputRef}
-        type="file"
-        accept={`.doc,.pdf,.hwp,.hwpx,.epub,.txt,.xlsx,.xls,.csv,.pptx,${IMAGE_EXTENSIONS.join(',')}`}
-        style={{ display: 'none' }}
-        onChange={handleFileInputChange}
+    body = (
+      <TxtEditor
+        key={txtKey}
+        initialText={txtState.text}
+        documentName={documentName}
+        onDocumentNameChange={setDocumentName}
+        onBack={() => setMode('docx')}
       />
+    );
+  } else if (mode === 'xlsx') {
+    body = (
+      <XlsxEditor
+        key={xlsxKey}
+        initialSheets={xlsxSheets}
+        pendingImportFile={xlsxPendingFile}
+        documentName={documentName}
+        onDocumentNameChange={setDocumentName}
+        onBack={() => setMode('docx')}
+      />
+    );
+  } else if (mode === 'pptx') {
+    body = (
+      <PptxEditor
+        key={pptxKey}
+        initialPresentation={pptxPresentation}
+        pendingImportFile={pptxPendingFile}
+        documentName={documentName}
+        onDocumentNameChange={setDocumentName}
+        onBack={() => setMode('docx')}
+      />
+    );
+  } else if (mode === 'hwp-view' && hwpState) {
+    body = (
+      <HwpViewer
+        doc={hwpState.doc}
+        fileName={hwpState.fileName}
+        onBack={() => setMode('docx')}
+        onConvertToEditable={() => void handleConvertHwpToEditable()}
+      />
+    );
+  } else if (mode === 'epub-view' && epubState) {
+    body = (
+      <EpubViewer
+        buffer={epubState.buffer}
+        fileName={epubState.fileName}
+        onBack={() => setMode('docx')}
+        onConvertToEditable={() => void handleConvertEpubToEditable()}
+        converting={epubConverting}
+      />
+    );
+  } else if (mode === 'image-view' && imageState) {
+    body = (
+      <ImageViewer
+        dataUrl={imageState.dataUrl}
+        fileName={imageState.fileName}
+        onBack={() => setMode('docx')}
+        onInsertIntoDocument={handleInsertImageIntoDocument}
+      />
+    );
+  } else {
+    body = (
       <DocxEditor
         key={editorKey}
         ref={editorRef}
@@ -416,20 +391,44 @@ function App() {
         rulerUnit="cm"
         mode="editing"
         className="app-editor"
-        toolbarExtra={
-          <>
-            <NewFileMenu onSelect={handleNewFile} />
-            <button
-              type="button"
-              className="open-other-format-btn"
-              onClick={() => fileInputRef.current?.click()}
-              title="打开 .doc / .pdf / .hwp / .hwpx / .epub / .txt / .xlsx / .pptx / 图片 文件（部分格式会转换为可编辑文档，部分仅供阅读）"
-            >
-              打开 DOC/PDF/HWP/EPUB/TXT/XLSX/PPTX/图片
-            </button>
-          </>
-        }
       />
+    );
+  }
+
+  return (
+    <div className="app-shell">
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept={`.doc,.pdf,.hwp,.hwpx,.epub,.txt,.xlsx,.xls,.csv,.pptx,${IMAGE_EXTENSIONS.join(',')}`}
+        style={{ display: 'none' }}
+        onChange={handleFileInputChange}
+      />
+      {/*
+        This bar used to be injected via DocxEditor's `toolbarExtra` prop,
+        living *inside* the library's own toolbar row. That row turned out to
+        have `overflow-x: auto` and a fixed height, which silently clipped
+        our dropdown every time it opened — the click worked, the menu
+        mounted in the DOM, it was just rendered outside the visible/scroll
+        area, so from the user's side "新建" looked like it did nothing.
+        Rendering it here, in our own unclipped top-level bar (above and
+        outside the third-party editor entirely), fixes that — and as a
+        bonus it now stays available no matter which mode (docx/xlsx/pptx/
+        txt/viewers) is currently showing, instead of only inside the docx
+        view.
+      */}
+      <div className="app-topbar">
+        <NewFileMenu onSelect={handleNewFile} />
+        <button
+          type="button"
+          className="open-other-format-btn"
+          onClick={() => fileInputRef.current?.click()}
+          title="打开 .doc / .pdf / .hwp / .hwpx / .epub / .txt / .xlsx / .pptx / 图片 文件（部分格式会转换为可编辑文档，部分仅供阅读）"
+        >
+          打开 DOC/PDF/HWP/EPUB/TXT/XLSX/PPTX/图片
+        </button>
+      </div>
+      <div className="app-body">{body}</div>
       {pendingPdf && (
         <div className="busy-overlay">
           <div className="busy-overlay__box pdf-choice-box">

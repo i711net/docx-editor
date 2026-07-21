@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import './NewFileMenu.css';
 
 export type NewFileKind = 'docx' | 'xlsx' | 'pptx' | 'txt';
@@ -14,51 +15,101 @@ interface NewFileMenuProps {
   onSelect: (kind: NewFileKind) => void;
 }
 
-/** Toolbar "新建" dropdown — lets the user start a blank docx/xlsx/pptx/txt. */
+/**
+ * Toolbar "新建" dropdown — lets the user start a blank docx/xlsx/pptx/txt.
+ *
+ * The dropdown panel is rendered through a React portal straight into
+ * `document.body`, positioned with `position: fixed` from the trigger
+ * button's live bounding rect, rather than as a normal in-place absolutely
+ * positioned child. This isn't just style preference: the underlying
+ * DocxEditor is a large third-party component tree, and somewhere in it an
+ * ancestor establishes its own CSS stacking context (a transform/opacity/etc.
+ * — not something we control or want to depend on). A plain
+ * `position: absolute` dropdown nested inside our own toolbar ended up
+ * compared against that library-internal stacking context rather than the
+ * page root, so despite a very high `z-index` the dropdown's items were
+ * visually present but unclickable — its own toolbar intercepted the click.
+ * Portaling to `document.body` sidesteps all of that: the dropdown is a
+ * direct child of `<body>`, in the same stacking context as everything else
+ * at the page root, so its z-index always wins.
+ */
 export function NewFileMenu({ onSelect }: NewFileMenuProps) {
   const [open, setOpen] = useState(false);
-  const rootRef = useRef<HTMLDivElement>(null);
+  const [coords, setCoords] = useState<{ top: number; left: number } | null>(null);
+  const triggerRef = useRef<HTMLButtonElement>(null);
+  const dropdownRef = useRef<HTMLDivElement>(null);
+
+  const openMenu = () => {
+    const rect = triggerRef.current?.getBoundingClientRect();
+    if (rect) {
+      setCoords({ top: rect.bottom + 4, left: rect.left });
+    }
+    setOpen(true);
+  };
 
   useEffect(() => {
     if (!open) return;
     const handleClickOutside = (e: MouseEvent) => {
-      if (rootRef.current && !rootRef.current.contains(e.target as Node)) {
+      const target = e.target as Node;
+      if (
+        triggerRef.current &&
+        !triggerRef.current.contains(target) &&
+        dropdownRef.current &&
+        !dropdownRef.current.contains(target)
+      ) {
         setOpen(false);
       }
     };
+    // Close (rather than try to reposition) on scroll/resize — simplest way
+    // to avoid the dropdown drifting away from the trigger button.
+    const handleReflow = () => setOpen(false);
     document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
+    window.addEventListener('scroll', handleReflow, true);
+    window.addEventListener('resize', handleReflow);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+      window.removeEventListener('scroll', handleReflow, true);
+      window.removeEventListener('resize', handleReflow);
+    };
   }, [open]);
 
   return (
-    <div className="new-file-menu" ref={rootRef}>
+    <>
       <button
+        ref={triggerRef}
         type="button"
         className="new-file-menu__trigger"
-        onClick={() => setOpen((v) => !v)}
+        onClick={() => (open ? setOpen(false) : openMenu())}
         title="新建空白文件"
       >
         ＋ 新建
       </button>
-      {open && (
-        <div className="new-file-menu__dropdown" role="menu">
-          {OPTIONS.map((opt) => (
-            <button
-              key={opt.kind}
-              type="button"
-              className="new-file-menu__item"
-              role="menuitem"
-              onClick={() => {
-                setOpen(false);
-                onSelect(opt.kind);
-              }}
-            >
-              <span className="new-file-menu__item-label">{opt.label}</span>
-              <span className="new-file-menu__item-desc">{opt.desc}</span>
-            </button>
-          ))}
-        </div>
-      )}
-    </div>
+      {open && coords &&
+        createPortal(
+          <div
+            className="new-file-menu__dropdown"
+            role="menu"
+            ref={dropdownRef}
+            style={{ position: 'fixed', top: coords.top, left: coords.left }}
+          >
+            {OPTIONS.map((opt) => (
+              <button
+                key={opt.kind}
+                type="button"
+                className="new-file-menu__item"
+                role="menuitem"
+                onClick={() => {
+                  setOpen(false);
+                  onSelect(opt.kind);
+                }}
+              >
+                <span className="new-file-menu__item-label">{opt.label}</span>
+                <span className="new-file-menu__item-desc">{opt.desc}</span>
+              </button>
+            ))}
+          </div>,
+          document.body,
+        )}
+    </>
   );
 }

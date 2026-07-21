@@ -2,6 +2,31 @@
   width: 100%;
   height: 100vh;
   overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+/*
+ * Sits above every mode (docx/xlsx/pptx/txt/viewers), completely outside the
+ * third-party DocxEditor's own toolbar. See the comment above this bar's JSX
+ * in App.tsx for why: its old home (DocxEditor's `toolbarExtra` slot) has an
+ * `overflow-x: auto` ancestor that silently clipped the "＋ 新建" dropdown.
+ */
+.app-topbar {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 10px;
+  background: #fff;
+  border-bottom: 1px solid #e0e0e0;
+  z-index: 10;
+}
+
+.app-body {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: hidden;
 }
 
 .app-editor {

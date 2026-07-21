@@ -1,8 +1,3 @@
-.new-file-menu {
-  position: relative;
-  display: inline-block;
-}
-
 .new-file-menu__trigger {
   border: 1px solid #2563eb;
   background: #2563eb;
@@ -20,9 +15,8 @@
 }
 
 .new-file-menu__dropdown {
-  position: absolute;
-  top: calc(100% + 4px);
-  left: 0;
+  /* position/top/left are set inline (see NewFileMenu.tsx) since this panel
+     is portaled straight into document.body with position: fixed. */
   background: #fff;
   border: 1px solid #d0d0d0;
   border-radius: 8px;
