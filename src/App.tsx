@@ -6,6 +6,7 @@ import {
 } from '@eigenpal/docx-editor-react';
 import type { Document } from '@eigenpal/docx-editor-core/types/document';
 import type { HwpDocument } from '@rhwp/core';
+import type { Sheet } from '@fortune-sheet/core';
 import zhCN from '@eigenpal/docx-editor-i18n/zh-CN';
 import '@eigenpal/docx-editor-react/styles.css';
 import './App.css';
@@ -17,9 +18,14 @@ import { extractParagraphsFromDoc } from './lib/docImport';
 import { extractParagraphsFromHwpDocument, loadHwpDocument } from './lib/hwp';
 import { extractParagraphsFromEpub } from './lib/epubImport';
 import { loadImageFile } from './lib/imageFileImport';
+import { createBlankPresentation, type Presentation } from './lib/pptxModel';
 import { HwpViewer } from './HwpViewer';
 import { EpubViewer } from './EpubViewer';
 import { ImageViewer } from './ImageViewer';
+import { XlsxEditor, createBlankSheets } from './XlsxEditor';
+import { PptxEditor } from './PptxEditor';
+import { TxtEditor } from './TxtEditor';
+import { NewFileMenu, type NewFileKind } from './NewFileMenu';
 
 const IMAGE_EXTENSIONS = ['.jpg', '.jpeg', '.png', '.gif', '.webp', '.bmp'];
 
@@ -33,7 +39,7 @@ function readSavedAuthor(): string {
   }
 }
 
-type Mode = 'docx' | 'hwp-view' | 'epub-view' | 'image-view';
+type Mode = 'docx' | 'hwp-view' | 'epub-view' | 'image-view' | 'xlsx' | 'pptx' | 'txt-edit';
 
 interface HwpState {
   doc: HwpDocument;
@@ -52,6 +58,11 @@ interface ImageState {
   fileName: string;
 }
 
+interface TxtState {
+  text: string;
+  fileName: string;
+}
+
 function App() {
   const editorRef = useRef<DocxEditorRef>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -67,6 +78,14 @@ function App() {
   const [imageState, setImageState] = useState<ImageState | null>(null);
   const [busyMessage, setBusyMessage] = useState<string | null>(null);
   const [pendingPdf, setPendingPdf] = useState<File | null>(null);
+  const [xlsxSheets, setXlsxSheets] = useState<Sheet[]>(() => createBlankSheets());
+  const [xlsxPendingFile, setXlsxPendingFile] = useState<File | null>(null);
+  const [xlsxKey, setXlsxKey] = useState(0);
+  const [pptxPresentation, setPptxPresentation] = useState<Presentation>(() => createBlankPresentation());
+  const [pptxPendingFile, setPptxPendingFile] = useState<File | null>(null);
+  const [pptxKey, setPptxKey] = useState(0);
+  const [txtState, setTxtState] = useState<TxtState>({ text: '', fileName: '未命名文本.txt' });
+  const [txtKey, setTxtKey] = useState(0);
 
   // Called when the user chooses File > Save (or Ctrl/Cmd+S) inside the
   // editor. The library hands us the packaged .docx bytes; we just need to
@@ -168,16 +187,30 @@ function App() {
         } else if (lower.endsWith('.txt')) {
           setBusyMessage('正在读取文本文件…');
           const text = await file.text();
-          const paragraphs = text.split(/\r?\n/);
-          loadConvertedDocument(paragraphs, file.name.replace(/\.txt$/i, '') + '.docx');
+          setTxtState({ text, fileName: file.name });
+          setTxtKey((k) => k + 1);
+          setDocumentName(file.name);
+          setMode('txt-edit');
         } else if (IMAGE_EXTENSIONS.some((ext) => lower.endsWith(ext))) {
           setBusyMessage('正在打开图片…');
           const { dataUrl, widthPx, heightPx } = await loadImageFile(file);
           setImageState({ dataUrl, widthPx, heightPx, fileName: file.name });
           setMode('image-view');
+        } else if (lower.endsWith('.xlsx') || lower.endsWith('.xls') || lower.endsWith('.csv')) {
+          setXlsxSheets(createBlankSheets());
+          setXlsxPendingFile(file);
+          setXlsxKey((k) => k + 1);
+          setDocumentName(file.name);
+          setMode('xlsx');
+        } else if (lower.endsWith('.pptx')) {
+          setPptxPresentation(createBlankPresentation());
+          setPptxPendingFile(file);
+          setPptxKey((k) => k + 1);
+          setDocumentName(file.name);
+          setMode('pptx');
         } else {
           window.alert(
-            '暂不支持这个文件类型。支持：.docx（原生编辑）、.doc、.pdf、.hwp、.hwpx、.epub、.txt、常见图片格式。',
+            '暂不支持这个文件类型。支持：.docx（原生编辑）、.doc、.pdf、.hwp、.hwpx、.epub、.txt、.xlsx/.xls/.csv、.pptx、常见图片格式。',
           );
         }
       } catch (err) {
@@ -235,6 +268,85 @@ function App() {
     setMode('docx');
   }, [imageState]);
 
+  // "新建" menu — starts a blank file of whichever native-editable format the
+  // user picked. PDF/EPUB deliberately aren't offered here (see README):
+  // "starting from a blank PDF/EPUB to edit" isn't really a meaningful
+  // action the way it is for docx/xlsx/pptx/txt.
+  const handleNewFile = useCallback((kind: NewFileKind) => {
+    switch (kind) {
+      case 'docx':
+        setInitialDocument(createEmptyDocument());
+        setDocumentName('未命名文档.docx');
+        setEditorKey((k) => k + 1);
+        setMode('docx');
+        break;
+      case 'txt':
+        setTxtState({ text: '', fileName: '未命名文本.txt' });
+        setTxtKey((k) => k + 1);
+        setDocumentName('未命名文本.txt');
+        setMode('txt-edit');
+        break;
+      case 'xlsx':
+        setXlsxSheets(createBlankSheets());
+        setXlsxPendingFile(null);
+        setXlsxKey((k) => k + 1);
+        setDocumentName('未命名表格.xlsx');
+        setMode('xlsx');
+        break;
+      case 'pptx':
+        setPptxPresentation(createBlankPresentation());
+        setPptxPendingFile(null);
+        setPptxKey((k) => k + 1);
+        setDocumentName('未命名演示文稿.pptx');
+        setMode('pptx');
+        break;
+    }
+  }, []);
+
+  if (mode === 'txt-edit') {
+    return (
+      <div className="app-shell">
+        <TxtEditor
+          key={txtKey}
+          initialText={txtState.text}
+          documentName={documentName}
+          onDocumentNameChange={setDocumentName}
+          onBack={() => setMode('docx')}
+        />
+      </div>
+    );
+  }
+
+  if (mode === 'xlsx') {
+    return (
+      <div className="app-shell">
+        <XlsxEditor
+          key={xlsxKey}
+          initialSheets={xlsxSheets}
+          pendingImportFile={xlsxPendingFile}
+          documentName={documentName}
+          onDocumentNameChange={setDocumentName}
+          onBack={() => setMode('docx')}
+        />
+      </div>
+    );
+  }
+
+  if (mode === 'pptx') {
+    return (
+      <div className="app-shell">
+        <PptxEditor
+          key={pptxKey}
+          initialPresentation={pptxPresentation}
+          pendingImportFile={pptxPendingFile}
+          documentName={documentName}
+          onDocumentNameChange={setDocumentName}
+          onBack={() => setMode('docx')}
+        />
+      </div>
+    );
+  }
+
   if (mode === 'hwp-view' && hwpState) {
     return (
       <div className="app-shell">
@@ -280,7 +392,7 @@ function App() {
       <input
         ref={fileInputRef}
         type="file"
-        accept={`.doc,.pdf,.hwp,.hwpx,.epub,.txt,${IMAGE_EXTENSIONS.join(',')}`}
+        accept={`.doc,.pdf,.hwp,.hwpx,.epub,.txt,.xlsx,.xls,.csv,.pptx,${IMAGE_EXTENSIONS.join(',')}`}
         style={{ display: 'none' }}
         onChange={handleFileInputChange}
       />
@@ -305,14 +417,17 @@ function App() {
         mode="editing"
         className="app-editor"
         toolbarExtra={
-          <button
-            type="button"
-            className="open-other-format-btn"
-            onClick={() => fileInputRef.current?.click()}
-            title="打开 .doc / .pdf / .hwp / .hwpx / .epub / .txt / 图片 文件（部分格式会转换为可编辑文档，部分仅供阅读）"
-          >
-            打开 DOC/PDF/HWP/EPUB/TXT/图片
-          </button>
+          <>
+            <NewFileMenu onSelect={handleNewFile} />
+            <button
+              type="button"
+              className="open-other-format-btn"
+              onClick={() => fileInputRef.current?.click()}
+              title="打开 .doc / .pdf / .hwp / .hwpx / .epub / .txt / .xlsx / .pptx / 图片 文件（部分格式会转换为可编辑文档，部分仅供阅读）"
+            >
+              打开 DOC/PDF/HWP/EPUB/TXT/XLSX/PPTX/图片
+            </button>
+          </>
         }
       />
       {pendingPdf && (

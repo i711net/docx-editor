@@ -1,0 +1,79 @@
+.txt-editor {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  background: #fff;
+}
+
+.txt-editor__bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  background: #fff;
+  border-bottom: 1px solid #e0e0e0;
+  flex-wrap: wrap;
+}
+
+.txt-editor__name-input {
+  font-weight: 600;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  padding: 4px 8px;
+  font-size: 14px;
+  min-width: 160px;
+  max-width: 320px;
+}
+
+.txt-editor__name-input:hover,
+.txt-editor__name-input:focus {
+  border-color: #d0d0d0;
+  outline: none;
+}
+
+.txt-editor__spacer {
+  flex: 1 1 auto;
+}
+
+.txt-editor__btn {
+  border: 1px solid #d0d0d0;
+  background: #fff;
+  border-radius: 6px;
+  padding: 6px 12px;
+  font-size: 13px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.txt-editor__btn:hover {
+  background: #f0f0f0;
+}
+
+.txt-editor__btn--primary {
+  background: #444;
+  border-color: #444;
+  color: #fff;
+}
+
+.txt-editor__btn--primary:hover {
+  background: #222;
+}
+
+.txt-editor__textarea {
+  flex: 1 1 auto;
+  min-height: 0;
+  border: none;
+  outline: none;
+  resize: none;
+  padding: 24px calc(50% - 380px);
+  font-size: 15px;
+  line-height: 1.7;
+  font-family: 'Times New Roman', ui-monospace, monospace;
+  color: #1a1a1a;
+}
+
+@media (max-width: 900px) {
+  .txt-editor__textarea {
+    padding: 20px;
+  }
+}

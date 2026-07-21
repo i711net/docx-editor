@@ -1,0 +1,71 @@
+.xlsx-editor {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  background: #fff;
+}
+
+.xlsx-editor__bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  background: #fff;
+  border-bottom: 1px solid #e0e0e0;
+  flex-wrap: wrap;
+}
+
+.xlsx-editor__name-input {
+  font-weight: 600;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  padding: 4px 8px;
+  font-size: 14px;
+  min-width: 160px;
+  max-width: 320px;
+}
+
+.xlsx-editor__name-input:hover,
+.xlsx-editor__name-input:focus {
+  border-color: #d0d0d0;
+  outline: none;
+}
+
+.xlsx-editor__spacer {
+  flex: 1 1 auto;
+}
+
+.xlsx-editor__btn {
+  border: 1px solid #d0d0d0;
+  background: #fff;
+  border-radius: 6px;
+  padding: 6px 12px;
+  font-size: 13px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.xlsx-editor__btn:hover {
+  background: #f0f0f0;
+}
+
+.xlsx-editor__btn--primary {
+  background: #16794e;
+  border-color: #16794e;
+  color: #fff;
+}
+
+.xlsx-editor__btn--primary:hover {
+  background: #106038;
+}
+
+.xlsx-editor__grid {
+  flex: 1 1 auto;
+  min-height: 0;
+  position: relative;
+}
+
+.xlsx-editor__grid > div {
+  width: 100%;
+  height: 100%;
+}
