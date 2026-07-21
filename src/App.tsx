@@ -15,7 +15,13 @@ import { extractParagraphsFromPdf } from './lib/pdfImport';
 import { renderPdfPagesAsImages } from './lib/pdfImageImport';
 import { extractParagraphsFromDoc } from './lib/docImport';
 import { extractParagraphsFromHwpDocument, loadHwpDocument } from './lib/hwp';
+import { extractParagraphsFromEpub } from './lib/epubImport';
+import { loadImageFile } from './lib/imageFileImport';
 import { HwpViewer } from './HwpViewer';
+import { EpubViewer } from './EpubViewer';
+import { ImageViewer } from './ImageViewer';
+
+const IMAGE_EXTENSIONS = ['.jpg', '.jpeg', '.png', '.gif', '.webp', '.bmp'];
 
 const AUTHOR_STORAGE_KEY = 'docx-editor:author';
 
@@ -27,10 +33,22 @@ function readSavedAuthor(): string {
   }
 }
 
-type Mode = 'docx' | 'hwp-view';
+type Mode = 'docx' | 'hwp-view' | 'epub-view' | 'image-view';
 
 interface HwpState {
   doc: HwpDocument;
+  fileName: string;
+}
+
+interface EpubState {
+  buffer: ArrayBuffer;
+  fileName: string;
+}
+
+interface ImageState {
+  dataUrl: string;
+  widthPx: number;
+  heightPx: number;
   fileName: string;
 }
 
@@ -44,6 +62,9 @@ function App() {
   const [initialDocument, setInitialDocument] = useState<Document>(() => createEmptyDocument());
   const [editorKey, setEditorKey] = useState(0);
   const [hwpState, setHwpState] = useState<HwpState | null>(null);
+  const [epubState, setEpubState] = useState<EpubState | null>(null);
+  const [epubConverting, setEpubConverting] = useState(false);
+  const [imageState, setImageState] = useState<ImageState | null>(null);
   const [busyMessage, setBusyMessage] = useState<string | null>(null);
   const [pendingPdf, setPendingPdf] = useState<File | null>(null);
 
@@ -139,8 +160,25 @@ function App() {
           const hwpDoc = await loadHwpDocument(buffer);
           setHwpState({ doc: hwpDoc, fileName: file.name });
           setMode('hwp-view');
+        } else if (lower.endsWith('.epub')) {
+          setBusyMessage('正在打开 EPUB…');
+          const buffer = await file.arrayBuffer();
+          setEpubState({ buffer, fileName: file.name });
+          setMode('epub-view');
+        } else if (lower.endsWith('.txt')) {
+          setBusyMessage('正在读取文本文件…');
+          const text = await file.text();
+          const paragraphs = text.split(/\r?\n/);
+          loadConvertedDocument(paragraphs, file.name.replace(/\.txt$/i, '') + '.docx');
+        } else if (IMAGE_EXTENSIONS.some((ext) => lower.endsWith(ext))) {
+          setBusyMessage('正在打开图片…');
+          const { dataUrl, widthPx, heightPx } = await loadImageFile(file);
+          setImageState({ dataUrl, widthPx, heightPx, fileName: file.name });
+          setMode('image-view');
         } else {
-          window.alert('暂不支持这个文件类型。支持：.docx（原生编辑）、.doc、.pdf、.hwp、.hwpx。');
+          window.alert(
+            '暂不支持这个文件类型。支持：.docx（原生编辑）、.doc、.pdf、.hwp、.hwpx、.epub、.txt、常见图片格式。',
+          );
         }
       } catch (err) {
         console.error(err);
@@ -172,6 +210,31 @@ function App() {
     }
   }, [hwpState, loadConvertedDocument]);
 
+  const handleConvertEpubToEditable = useCallback(async () => {
+    if (!epubState) return;
+    setEpubConverting(true);
+    try {
+      const paragraphs = await extractParagraphsFromEpub(epubState.buffer);
+      loadConvertedDocument(paragraphs, epubState.fileName.replace(/\.epub$/i, '') + '（由EPUB转换）.docx');
+    } catch (err) {
+      console.error(err);
+      window.alert(`提取 EPUB 文字失败：${err instanceof Error ? err.message : String(err)}`);
+    } finally {
+      setEpubConverting(false);
+    }
+  }, [epubState, loadConvertedDocument]);
+
+  const handleInsertImageIntoDocument = useCallback(() => {
+    if (!imageState) return;
+    const doc = buildDocumentFromPageImages([
+      { dataUrl: imageState.dataUrl, widthPx: imageState.widthPx, heightPx: imageState.heightPx },
+    ]);
+    setInitialDocument(doc);
+    setDocumentName(imageState.fileName.replace(/\.[^.]+$/, '') + '（图片）.docx');
+    setEditorKey((k) => k + 1);
+    setMode('docx');
+  }, [imageState]);
+
   if (mode === 'hwp-view' && hwpState) {
     return (
       <div className="app-shell">
@@ -185,12 +248,39 @@ function App() {
     );
   }
 
+  if (mode === 'epub-view' && epubState) {
+    return (
+      <div className="app-shell">
+        <EpubViewer
+          buffer={epubState.buffer}
+          fileName={epubState.fileName}
+          onBack={() => setMode('docx')}
+          onConvertToEditable={() => void handleConvertEpubToEditable()}
+          converting={epubConverting}
+        />
+      </div>
+    );
+  }
+
+  if (mode === 'image-view' && imageState) {
+    return (
+      <div className="app-shell">
+        <ImageViewer
+          dataUrl={imageState.dataUrl}
+          fileName={imageState.fileName}
+          onBack={() => setMode('docx')}
+          onInsertIntoDocument={handleInsertImageIntoDocument}
+        />
+      </div>
+    );
+  }
+
   return (
     <div className="app-shell">
       <input
         ref={fileInputRef}
         type="file"
-        accept=".doc,.pdf,.hwp,.hwpx"
+        accept={`.doc,.pdf,.hwp,.hwpx,.epub,.txt,${IMAGE_EXTENSIONS.join(',')}`}
         style={{ display: 'none' }}
         onChange={handleFileInputChange}
       />
@@ -219,9 +309,9 @@ function App() {
             type="button"
             className="open-other-format-btn"
             onClick={() => fileInputRef.current?.click()}
-            title="打开 .doc / .pdf / .hwp / .hwpx 文件（会转换为可编辑文档）"
+            title="打开 .doc / .pdf / .hwp / .hwpx / .epub / .txt / 图片 文件（部分格式会转换为可编辑文档，部分仅供阅读）"
           >
-            打开 DOC/PDF/HWP
+            打开 DOC/PDF/HWP/EPUB/TXT/图片
           </button>
         }
       />
