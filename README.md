@@ -13,7 +13,7 @@
 | 格式 | 能做到什么 | 做不到什么 |
 | --- | --- | --- |
 | **WPS Office 文档**（`.docx`） | WPS 现代版本默认就是标准 OOXML，和 Word 的 `.docx` 完全一致，**已经原生支持**，不需要任何转换。 | 如果是上世纪 90 年代~2000 年代的旧版 `.wps` 二进制格式，目前没有任何开源库能解析，业界通行做法是丢给云端转换服务——本项目没有做这个。 |
-| **PDF** | 用 [pdf.js](https://mozilla.github.io/pdf.js/) 提取文字内容，按行间距/字号变化启发式地拼回自然段落，转换成可以像 Word 一样自由编辑、真正重新排版的文档。 | 这是"近似还原"，不是像素级还原：多栏排版、表格、图片目前不会被保留，复杂版式的分段可能不够准确。真正做到"点开 PDF 原地改字、自动重排"这件事，连 Adobe Acrobat 都没有完全做到，开源生态里也没有成熟方案——所以这里选择的是转换路线，而不是假装能做到做不到的事。 |
+| **PDF** | 打开 PDF 时会弹出选择框，两种模式都支持：① 用 [pdf.js](https://mozilla.github.io/pdf.js/) 提取文字内容，按行间距/字号变化启发式地拼回自然段落，转换成可以像 Word 一样自由编辑、真正重新排版的文档；② 把每一页原样渲染成图片整页嵌入文档，版式 100% 还原（适合扫描件、复杂排版、或者根本不需要改文字，只是想要一份可以用 Word/WPS 打开的副本）。 | 方式①是"近似还原"，不是像素级还原：多栏排版、表格、图片目前不会被保留，复杂版式的分段可能不够准确。方式②反过来——版式完美但文字不可编辑/不可选中/不可搜索。真正做到"点开 PDF 原地改字、自动重排"这件事，连 Adobe Acrobat 都没有完全做到，开源生态里也没有成熟方案，所以这里给你两条路线选，而不是假装能做到做不到的事。 |
 | **旧版 `.doc`**（Word 97-2003 二进制格式） | 用 [`word-extractor`](https://github.com/morungos/node-word-extractor) 提取纯文字内容（分段准确，因为文件本身就有清晰的段落边界）。 | 不保留任何格式（字体、颜色、表格、图片全部丢失），纯文本导入。 |
 | **HWP / HWPX**（韩国"한글"文档） | 用 [`@rhwp/core`](https://github.com/edwardkim/rhwp)（MIT 协议，Rust+WASM）在浏览器本地渲染，可以**只读预览原始排版**（分页、缩放）；点击"转换为可编辑文档"可以把文字提取出来，导入到同一个 docx 编辑器里自由编辑。 | 预览是只读的——rhwp 底层其实有一套编辑 API，但那是面向程序调用的低层 API（按 section/段落/字符偏移量操作），不是一套现成的"点哪改哪"交互，要做成真正的所见即所得 HWP 编辑器是一个独立的大工程，这里没有做。如果你需要**保留原始 HWP 格式**编辑并存回 `.hwp`，作者本人做了一个更完整的方案 [`@rhwp/editor`](https://www.npmjs.com/package/@rhwp/editor)，但它是把一个完整的编辑器界面通过 iframe 嵌入进来，默认会连接到作者托管在 `edwardkim.github.io` 的页面（也可以自建替换 `studioUrl`）——考虑到隐私和"完全离线自包含"的定位，本项目默认没有接入这个，只用了纯本地运行的 `@rhwp/core`。 |
 
@@ -70,7 +70,9 @@ npx wrangler pages deploy dist --project-name=docx-editor
 │   ├── HwpViewer.tsx / .css   # HWP/HWPX 只读预览视图
 │   ├── lib/
 │   │   ├── buildDocumentFromParagraphs.ts  # 把一组段落文字拼装成合法的 Document 对象
+│   │   ├── buildDocumentFromImages.ts       # 把一组整页图片拼装成合法的 Document 对象（DocumentAgent.insertImage）
 │   │   ├── pdfImport.ts                     # PDF → 段落文字（pdf.js + 启发式分段）
+│   │   ├── pdfImageImport.ts                # PDF → 每页一张 PNG 图片（pdf.js canvas 渲染）
 │   │   ├── docImport.ts                     # 旧版 .doc → 段落文字（word-extractor）
 │   │   └── hwp.ts                           # HWP/HWPX 解析、渲染、文字提取（@rhwp/core）
 │   ├── App.css / index.css
@@ -103,3 +105,4 @@ npx wrangler pages deploy dist --project-name=docx-editor
 - **`@eigenpal/docx-editor-*` 在 npm 上被标记为 deprecated**：核心编辑器库的作者正在把包名从 `@eigenpal/docx-editor-*` 迁移到 `@docx-editor.dev/*`（前面提到的"品牌重塑"）。截至本项目构建时，`@eigenpal/docx-editor-react@1.9.0`（本仓库实际使用、且经过充分测试确认可用的版本）已经被标记为 deprecated，但新的 `@docx-editor.dev/*` 包目前还只是占位（几乎是空文件，不能用）。也就是说：**现在能用的就是 `@eigenpal/*`，能力和功能都没问题，只是 npm 会有一条 deprecated 警告**。等作者真正把代码发布到新包名下之后，迁移大概率只是把 import 路径里的包名换一下（API 应该是同一套），到时候关注一下 [官方仓库](https://github.com/eigenpal/docx-editor) 的动态即可。
 - **不要升级 `pdfjs-dist` 到 `6.x`**：实测 `6.1.200` 的 worker 里用了 `Map.prototype.getOrInsertComputed`（一个还没有普及的很新的 JS 引擎特性），在目前主流浏览器上会直接报错 `getOrInsertComputed is not a function`，PDF 打开会失败。本仓库锁定在 `4.10.38`，这个问题不存在。以后升级前先拿真实 PDF 测一下。
 - **HWP 没有拿到真实样本文件做端到端测试**：`@rhwp/core` 的接入是按官方文档 API 做的，也验证过 WASM 能正常初始化、对不支持的文件能给出清晰的报错（不会崩溃），但没能找到一个真实 `.hwp`/`.hwpx` 文件跑通"打开并看到内容"这一步。建议你部署后用自己手头的真实 HWP 文件测一下；如果解析出问题，大概率是 `src/lib/hwp.ts` 里的调用方式需要微调，可以对照 `node_modules/@rhwp/core/README.md`。
+- **图片插入用的是 `DocumentAgent.insertImage`，不是手搓 JSON**：一开始尝试直接拼装 `{ type: 'image', ... }` 这样的内容节点，但图片要真正存进 `.docx` 还需要在 `word/_rels/document.xml.rels` 和 `[Content_Types].xml` 里正确注册关系和媒体文件，手工拼很容易拼出一个"看起来对、存出来是坏的"文件。改用官方提供的 `DocumentAgent.insertImage(position, dataUrl, options)`（immutable、链式调用）之后，实测导出的 `.docx` 里 `word/media/image1.png` 等都被正确写入——如果你要扩展"插入图片"相关的功能，建议继续走这条路径，不要绕过它直接改 JSON。

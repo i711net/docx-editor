@@ -39,3 +39,63 @@
   font-size: 14px;
   box-shadow: 0 8px 30px rgba(0, 0, 0, 0.25);
 }
+
+.pdf-choice-box {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  width: 420px;
+  max-width: 90vw;
+  padding: 20px 22px;
+}
+
+.pdf-choice-box__title {
+  margin: 0 0 4px;
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.pdf-choice-box__option {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+  text-align: left;
+  border: 1px solid #d8d8d8;
+  border-radius: 8px;
+  background: #fafafa;
+  padding: 10px 12px;
+  cursor: pointer;
+}
+
+.pdf-choice-box__option:hover {
+  border-color: #2563eb;
+  background: #eff6ff;
+}
+
+.pdf-choice-box__option-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: #111;
+}
+
+.pdf-choice-box__option-desc {
+  font-size: 12.5px;
+  line-height: 1.5;
+  color: #666;
+}
+
+.pdf-choice-box__cancel {
+  align-self: center;
+  margin-top: 4px;
+  border: none;
+  background: none;
+  color: #888;
+  font-size: 13px;
+  cursor: pointer;
+  padding: 4px;
+}
+
+.pdf-choice-box__cancel:hover {
+  text-decoration: underline;
+}

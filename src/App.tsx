@@ -10,7 +10,9 @@ import zhCN from '@eigenpal/docx-editor-i18n/zh-CN';
 import '@eigenpal/docx-editor-react/styles.css';
 import './App.css';
 import { buildDocumentFromParagraphs } from './lib/buildDocumentFromParagraphs';
+import { buildDocumentFromPageImages } from './lib/buildDocumentFromImages';
 import { extractParagraphsFromPdf } from './lib/pdfImport';
+import { renderPdfPagesAsImages } from './lib/pdfImageImport';
 import { extractParagraphsFromDoc } from './lib/docImport';
 import { extractParagraphsFromHwpDocument, loadHwpDocument } from './lib/hwp';
 import { HwpViewer } from './HwpViewer';
@@ -43,6 +45,7 @@ function App() {
   const [editorKey, setEditorKey] = useState(0);
   const [hwpState, setHwpState] = useState<HwpState | null>(null);
   const [busyMessage, setBusyMessage] = useState<string | null>(null);
+  const [pendingPdf, setPendingPdf] = useState<File | null>(null);
 
   // Called when the user chooses File > Save (or Ctrl/Cmd+S) inside the
   // editor. The library hands us the packaged .docx bytes; we just need to
@@ -79,15 +82,52 @@ function App() {
     setMode('docx');
   }, []);
 
+  const handlePdfAsText = useCallback(
+    async (file: File) => {
+      setPendingPdf(null);
+      setBusyMessage('正在解析 PDF，尽力还原段落结构…');
+      try {
+        const buffer = await file.arrayBuffer();
+        const paragraphs = await extractParagraphsFromPdf(buffer);
+        loadConvertedDocument(paragraphs, file.name.replace(/\.pdf$/i, '') + '（由PDF转换·文字）.docx');
+      } catch (err) {
+        console.error(err);
+        window.alert(`解析 PDF 失败：${err instanceof Error ? err.message : String(err)}`);
+      } finally {
+        setBusyMessage(null);
+      }
+    },
+    [loadConvertedDocument],
+  );
+
+  const handlePdfAsImages = useCallback(
+    async (file: File) => {
+      setPendingPdf(null);
+      setBusyMessage('正在把 PDF 每一页渲染成图片…');
+      try {
+        const buffer = await file.arrayBuffer();
+        const images = await renderPdfPagesAsImages(buffer);
+        const doc = buildDocumentFromPageImages(images);
+        setInitialDocument(doc);
+        setDocumentName(file.name.replace(/\.pdf$/i, '') + '（由PDF转换·图片）.docx');
+        setEditorKey((k) => k + 1);
+        setMode('docx');
+      } catch (err) {
+        console.error(err);
+        window.alert(`转换 PDF 失败：${err instanceof Error ? err.message : String(err)}`);
+      } finally {
+        setBusyMessage(null);
+      }
+    },
+    [],
+  );
+
   const handleOpenOtherFormat = useCallback(
     async (file: File) => {
       const lower = file.name.toLowerCase();
       try {
         if (lower.endsWith('.pdf')) {
-          setBusyMessage('正在解析 PDF，尽力还原段落结构…');
-          const buffer = await file.arrayBuffer();
-          const paragraphs = await extractParagraphsFromPdf(buffer);
-          loadConvertedDocument(paragraphs, file.name.replace(/\.pdf$/i, '') + '（由PDF转换）.docx');
+          setPendingPdf(file);
         } else if (lower.endsWith('.doc')) {
           setBusyMessage('正在读取 .doc 文件（仅提取文字，不含原格式）…');
           const buffer = await file.arrayBuffer();
@@ -185,6 +225,32 @@ function App() {
           </button>
         }
       />
+      {pendingPdf && (
+        <div className="busy-overlay">
+          <div className="busy-overlay__box pdf-choice-box">
+            <p className="pdf-choice-box__title">这个 PDF 要怎么导入？</p>
+            <button type="button" className="pdf-choice-box__option" onClick={() => void handlePdfAsText(pendingPdf)}>
+              <span className="pdf-choice-box__option-title">转换为可编辑文字</span>
+              <span className="pdf-choice-box__option-desc">
+                提取文字并按段落重新排版，之后可以像 Word 一样自由编辑、重新排版。排版是近似还原，复杂版式（多栏、表格）可能不准确。
+              </span>
+            </button>
+            <button
+              type="button"
+              className="pdf-choice-box__option"
+              onClick={() => void handlePdfAsImages(pendingPdf)}
+            >
+              <span className="pdf-choice-box__option-title">保留原始排版（导入为图片）</span>
+              <span className="pdf-choice-box__option-desc">
+                把每一页原样渲染成图片放进文档，版式 100% 还原，但文字不可编辑、不可选中——适合扫描件或版式复杂、不需要改文字的情况。
+              </span>
+            </button>
+            <button type="button" className="pdf-choice-box__cancel" onClick={() => setPendingPdf(null)}>
+              取消
+            </button>
+          </div>
+        </div>
+      )}
       {busyMessage && (
         <div className="busy-overlay">
           <div className="busy-overlay__box">{busyMessage}</div>
