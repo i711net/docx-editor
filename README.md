@@ -36,6 +36,19 @@
 
 也就是说：**.docx / .xlsx / .pptx / .txt 是原生完整编辑体验，PDF/.doc/HWP/EPUB 是"转换成可编辑文档"体验，图片是"插入"体验**——内容找回来了，但原始版式不是全部都能保留。这是经过调研后判断更现实、更诚实的方案，而不是画一个"什么都能编辑"的饼。
 
+### 解除文件限制（工具栏"解除文件限制"按钮）
+
+去掉 PDF 的"禁止编辑/打印/复制"限制，或 PPTX 的 PowerPoint"限制编辑"保护——**仅限本来就能正常打开、阅读的文件**，选好文件后立刻在本地处理完成并自动下载一份新文件，不上传、不联网。
+
+**这不是密码破解/找回功能，也刻意没有做成一个。** 如果你的文件是"打开都要密码，而这个密码你忘了"，这个按钮帮不了你——这里没有、以后也不打算做任何形式的密码暴力破解或恢复：技术上对真正加密过的强密码基本不可行，即便对弱密码可行，这个工具也没有办法判断你是不是文件真正的所有者，贸然做一个"破解他人文件密码"的功能不合适。如果是这种情况，建议：先查自己的密码管理器/浏览器保存的密码，找当初设密码的人要，或者走企业 IT 部门的恢复流程。
+
+支持的两种情况，都不需要知道真实密码就能处理，原因不是"绕过"了什么，而是这两种保护机制设计上本来就不需要：
+
+- **PDF**：PDF 规范里的"所有者密码"（owner password）只用来限制打印/编辑/复制，如果文件的"用户密码"（打开密码）是空的——也就是这个文件现在任何人都能直接打开阅读——那么解密所需的密钥推导过程根本不需要用到所有者密码的明文，`qpdf`（本项目用的 [`@neslinesli93/qpdf-wasm`](https://www.npmjs.com/package/@neslinesli93/qpdf-wasm) 就是把这个工具编译成 WASM 拿到浏览器里跑）几十年来一直能在不知道所有者密码的情况下去掉这类限制，这是规范本身的设计，不是安全漏洞。如果文件设置了打开密码（不是空的），处理会明确失败并提示"需要打开密码"，不会尝试猜测或绕过。
+- **PPTX**：PowerPoint 的"限制编辑"功能，存的是 `ppt/presentation.xml` 里的一个 `<p:modifyVerifier>` 元素（一段密码的哈希值），PowerPoint 的界面在你点"编辑"之前会检查这个哈希——但它**并不会加密**幻灯片内容本身，整个文件从始至终都是一个完全正常、可以直接读取解析的 OOXML 压缩包。所以去掉限制只需要删除这一个 XML 节点再重新打包，全程不涉及也不需要真实密码。
+
+两种情况处理前后文件内容本身都不会有任何变化，只是去掉了限制标记；如果选中的文件本来就没有设置相应限制，会原样生成一份副本并如实告知。
+
 ## 本地运行
 
 需要 Node.js 18+。
@@ -139,6 +152,7 @@ npx wrangler pages deploy dist --project-name=docx-editor
 - [`jszip`](https://www.npmjs.com/package/jszip) — MIT/GPL 双协议，本项目按 MIT 条款使用。
 - [`chart.js`](https://www.npmjs.com/package/chart.js) — MIT License，用于 Excel 图表的离屏渲染。
 - [`idb-keyval`](https://www.npmjs.com/package/idb-keyval) — Apache License 2.0，自动保存草稿功能对 IndexedDB 的轻量封装。
+- [`@neslinesli93/qpdf-wasm`](https://www.npmjs.com/package/@neslinesli93/qpdf-wasm) — ISC License，零依赖，把 [QPDF](https://github.com/qpdf/qpdf)（Apache License 2.0）编译成 WASM 供浏览器使用，"解除文件限制"功能里 PDF 那一半用的就是它。
 - 本仓库的胶水代码（`src/` 下的文件）同样以 Apache License 2.0 发布，见 `LICENSE`。
 
 ## 已知坑 / 排查笔记
@@ -155,4 +169,6 @@ npx wrangler pages deploy dist --project-name=docx-editor
 - **PPT 切换效果/元素动画为什么只是"应用内预览"，没有写进导出的 .pptx**：真实 PowerPoint 的动画/切换时序信息存在 OOXML 里一套很深、几乎没有文档的结构（`<p:timing>`、`<p:transition>`），而本项目的导出库 `pptxgenjs` 完全没有暴露写这部分 XML 的 API。手写这段 XML 风险很高（时序模型本身就复杂，写错了不是"效果不对"而是"文件可能打不开"），所以这里做的是一个诚实的取舍：切换效果/动画的设置照常保存在我们自己的数据模型里（`Slide.transition` / `SlideElement.animation`），点"▶ 播放"能在应用内看到真实的动画效果（`PptxPresentMode.tsx`），但导出成真实 `.pptx` 后，这些元素在 PowerPoint/WPS 里会原样静止显示——不是"没保存"，是"这一层信息目前没有安全的写入路径"。如果以后有余力啃 `<p:timing>` 这块，`pptxExport.ts` 是要改的地方。
 - **Excel 图表用的是 `updateSheet` + 手工构造的 `Image` 对象，不是 fortune-sheet 自带的图表 UI**：查过 `@fortune-sheet/react` 的类型定义和导出的组件列表，这个版本并没有像 Luckysheet 老版本那样自带一个"插入图表"的浮动 DOM 组件；同时 `exceljs`（`@corbe30/fortune-excel` 依赖的库）也没有 `addChart` 一类的 API。所以 `xlsxChart.ts` 走的是：读取所选区域数据 → 用 `chart.js` 在一个离屏 `<canvas>` 上画出图表 → 转成 PNG → 用 `workbookRef.current.updateSheet(...)` 把这张图片作为 `Sheet.images` 里的一个浮动图片对象插入（这个字段本来就是 fortune-sheet 用来承载"插入图片"功能的，插入图表只是复用了同一条路径）。已经过 Playwright + openpyxl 验证：插入的图表在应用内可拖拽/缩放，导出后 `xl/media/` 里能找到对应的真实图片文件，用 Excel/WPS 打开也能看到。局限就是上面表格里写的：这是一张画出来的图，不是能双击改数据的原生图表对象。
 - **`saveDraft`/`clearDraft` 之间有一个真实存在过的竞态，已经修**：自动保存草稿用的是"停止输入 1.5 秒后才真正写入 IndexedDB"的防抖策略；如果用户在防抖计时器还没触发前就点了"保存"，"保存"里的 `clearDraft` 会先执行，但那个已经排队的防抖写入依然会在几百毫秒后触发，把刚清掉的草稿又写回去——导致"明明点了保存，下次打开却还提示有草稿要恢复"。用 Playwright 端到端测试（保存后关闭编辑器再重新打开，检查草稿提示条是否还在）才捕捉到这个问题。修复方式是让 `debounce()`（`src/lib/autosave.ts`）返回的函数带一个 `.cancel()` 方法，四个编辑器的"保存"逻辑里都改成先调用 `debouncedAutosave.cancel()` 再调用 `clearDraft`，避免那个排队中的写入在清除之后又抢跑一次。
+- **`@neslinesli93/qpdf-wasm` 没有暴露 `print`/`printErr` 回调，出错信息靠临时接管 `console`拿**：这个包把 QPDF 编译成的 Emscripten 模块直接把 stdout/stderr 写到 `console.log`/`console.error`，没有像很多 Emscripten 包那样在初始化配置里留一个 `print`/`printErr` 钩子给调用方接管。`src/lib/pdfUnlock.ts` 的做法是在调用 `qpdf.callMain(...)` 前后临时替换全局 `console.log`/`console.error`（用 `try/finally` 保证无论成功失败都会恢复），把 QPDF 自己打印的诊断文字（比如"密码不对"）收集起来，用来判断失败原因是不是"这个文件需要打开密码"，从而给出更准确的报错文案而不是笼统的"处理失败"。这个包的类型定义（`dist/qpdf.d.ts`）也没声明 `FS.writeFile`（只声明了 `mkdir`/`mount`/`unmount`/`readFile`），但运行时是有这个方法的（官方 README 的用法示例也用了它）——所以对 `FS` 做了一个窄类型的强制转换，而不是把整个 `qpdf` 对象转成 `any`。
+- **接入 `qpdf-wasm` 时 `npm audit` 突然多出一堆高危漏洞，排查后确认跟它无关**：`npm install @neslinesli93/qpdf-wasm` 之后 `npm audit` 从原本的"6 low"突然跳到"12 个漏洞（6 low + 2 moderate + 4 high）"，第一反应是怀疑新装的包有问题——但用 `npm view` 确认这个包本身零依赖，再把它卸载重新跑 `npm audit`，同样的 12 个漏洞照样在，证明这次跳变是 npm 漏洞库自身更新（或锁文件里其他既有依赖的版本浮动）导致的，跟这次新增的依赖无关。用不带 `--force` 的 `npm audit fix` 修掉了其中能安全升级的 4 个（`brace-expansion`/`dompurify`/`nanoid`/`postcss`），剩下 2 个高危目前都在传递依赖的深处，且修复需要破坏性降级——`elliptic`（经 `vite-plugin-node-polyfills → node-stdlib-browser → crypto-browserify` 链路引入，上游还没有更高版本能修）和 `image-size`（经 `pptxgenjs` 引入，`npm audit fix --force` 会把 `pptxgenjs` 从 `4.0.1` 强行降到 `1.1.5`，直接砸掉已经验证过的 PPT 导出功能）——两者都不是"装了新包才有的问题"，而是既有依赖树里本来就存在、只是这次 audit 才被翻出来的，暂时按"已知、不做破坏性降级"处理，等上游有兼容版本修复再升级。
 - **测试用的 EPUB 标题乱码是 fixture 生成问题，不是本项目的 bug**：本仓库用 `pandoc` 在沙箱里生成过测试用的 `.epub`（真实用户文件不会有这个问题）。发现标题页文字（`title_page.xhtml` 里的 `<title>`/`<h1>`）会变成 `����...` 乱码，但用 `unzip` 解压检查后确认：不是本项目读取/渲染出的问题，而是 `pandoc` 在这个沙箱环境的 locale 设置下生成 epub 元数据（`title`/`author`）时，写入文件的字节本身就已经损坏了；同一份 epub 里正文章节（`ch001.xhtml` 等）的中文内容完全正常，恰好印证了问题出在 pandoc 的标题页生成路径，而不是本项目的解析/渲染逻辑。用真实电子书文件测试不会遇到这个问题。

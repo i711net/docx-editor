@@ -1,0 +1,51 @@
+.unlock-dialog {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  width: 440px;
+  max-width: 90vw;
+  padding: 20px 22px;
+}
+
+.unlock-dialog__title {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.unlock-dialog__desc {
+  margin: 0;
+  font-size: 12.5px;
+  line-height: 1.6;
+  color: #666;
+}
+
+.unlock-dialog__pick-btn {
+  align-self: flex-start;
+  border: 1px solid #2563eb;
+  background: #eff6ff;
+  color: #2563eb;
+  border-radius: 8px;
+  padding: 8px 14px;
+  font-size: 13.5px;
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.unlock-dialog__pick-btn:hover {
+  background: #dbeafe;
+}
+
+.unlock-dialog__status {
+  margin: 0;
+  font-size: 13.5px;
+  line-height: 1.6;
+}
+
+.unlock-dialog__status--ok {
+  color: #15803d;
+}
+
+.unlock-dialog__status--error {
+  color: #b91c1c;
+}

@@ -28,6 +28,7 @@ import { TxtEditor } from './TxtEditor';
 import { NewFileMenu, type NewFileKind } from './NewFileMenu';
 import { clearDraft, debounce, loadDraft, saveDraft, type DraftEnvelope } from './lib/autosave';
 import { DraftBanner } from './DraftBanner';
+import { UnlockFileDialog } from './UnlockFileDialog';
 
 const DOCX_AUTOSAVE_KIND = 'docx';
 
@@ -91,6 +92,7 @@ function App() {
   const [txtState, setTxtState] = useState<TxtState>({ text: '', fileName: '未命名文本.txt' });
   const [txtKey, setTxtKey] = useState(0);
   const [docxDraft, setDocxDraft] = useState<DraftEnvelope<{ document: Document }> | null>(null);
+  const [unlockDialogOpen, setUnlockDialogOpen] = useState(false);
 
   useEffect(() => {
     void loadDraft<{ document: Document }>(DOCX_AUTOSAVE_KIND).then(setDocxDraft);
@@ -476,8 +478,17 @@ function App() {
         >
           打开 DOC/PDF/HWP/EPUB/TXT/XLSX/PPTX/图片
         </button>
+        <button
+          type="button"
+          className="open-other-format-btn"
+          onClick={() => setUnlockDialogOpen(true)}
+          title="去掉 PDF 的禁止编辑/打印/复制限制，或 PPTX 的限制编辑保护（仅限已经能正常打开阅读的文件，不做密码破解）"
+        >
+          解除文件限制
+        </button>
       </div>
       <div className="app-body">{body}</div>
+      {unlockDialogOpen && <UnlockFileDialog onClose={() => setUnlockDialogOpen(false)} />}
       {pendingPdf && (
         <div className="busy-overlay">
           <div className="busy-overlay__box pdf-choice-box">
