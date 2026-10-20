@@ -1,18 +1,31 @@
 /// <reference lib="webworker" />
 import { Buffer } from 'buffer';
 import process from 'process';
+// Side-effect only: this package's own job is exactly to attach
+// `setImmediate`/`clearImmediate` to whatever global it finds (it has
+// explicit Web Worker support via `MessageChannel`), so just importing it
+// is the whole fix — see the comment below for which code needs it.
+import 'setimmediate';
 
-// `vite-plugin-node-polyfills`'s global-injection shims (for both `Buffer`
-// and `process`) only hook into the main entry transform, not a separate
+// `vite-plugin-node-polyfills`'s global-injection shims (for `Buffer` and
+// `process`) only hook into the main entry transform, not a separate
 // worker build — so unlike in the main bundle, neither is already global
 // here. word-extractor's own transitive dependencies (the zip-reading path
-// used for .docx-shaped input, and the Node stream/fs polyfills that come
-// along with it even though we never exercise that branch) reference both
-// as real globals at module top level, not through a module-local import
-// binding — e.g. `ole-header.js` does `Buffer.from(...)` immediately on
-// import, and bundled stream-polyfill internals read `process.nextTick` /
-// `process.cwd()` the same way. So both have to be set as globals before
-// word-extractor is imported.
+// used for .docx-shaped input — i.e. a file with a `.doc` name whose actual
+// bytes are a modern OOXML/zip package, which happens more often than it
+// sounds: lots of software just defaults to a `.doc` extension regardless
+// of what it actually wrote — plus the Node stream/fs polyfills that come
+// along with that path) reference `Buffer`/`process` as real globals at
+// module top level, not through a module-local import binding — e.g.
+// `ole-header.js` does `Buffer.from(...)` immediately on import, and
+// bundled stream-polyfill internals read `process.nextTick` / `process.cwd()`
+// the same way. That same zip-reading path (`yauzl` → `fd-slicer`'s
+// `BufferSlicer.read`/`.write`) also calls the bare global `setImmediate`
+// directly, assuming a Node environment — confirmed live: a real user hit
+// `打开文件失败：setImmediate is not defined` opening a `.doc`-named file
+// that turned out to be zip-based, after the `Buffer`/`process` fix above
+// was already deployed and otherwise working. So all three have to be set
+// as globals before word-extractor is imported.
 //
 // That import can't be a static one: static imports are hoisted and
 // evaluated before any other top-level statement in *this* file, which

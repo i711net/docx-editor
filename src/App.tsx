@@ -16,6 +16,7 @@ import { buildDocumentFromPageImages } from './lib/buildDocumentFromImages';
 import { extractParagraphsFromPdf } from './lib/pdfImport';
 import { renderPdfPagesAsImages } from './lib/pdfImageImport';
 import { extractParagraphsFromDoc } from './lib/docImport';
+import { looksLikeZipPackage } from './lib/fileSniff';
 import { extractParagraphsFromHwpDocument, loadHwpDocument } from './lib/hwp';
 import { extractParagraphsFromEpub } from './lib/epubImport';
 import { loadImageFile } from './lib/imageFileImport';
@@ -195,6 +196,17 @@ function App() {
     [],
   );
 
+  const openAsNativeDocx = useCallback(
+    async (buffer: ArrayBuffer, documentName: string) => {
+      const doc = await parseDocx(buffer);
+      setInitialDocument(doc);
+      setDocumentName(documentName);
+      setEditorKey((k) => k + 1);
+      setMode('docx');
+    },
+    [],
+  );
+
   const handleOpenOtherFormat = useCallback(
     async (file: File) => {
       const lower = file.name.toLowerCase();
@@ -210,18 +222,34 @@ function App() {
           // only way in was the easy-to-miss menu item.
           setBusyMessage('正在打开 .docx 文档…');
           const buffer = await file.arrayBuffer();
-          const doc = await parseDocx(buffer);
-          setInitialDocument(doc);
-          setDocumentName(file.name);
-          setEditorKey((k) => k + 1);
-          setMode('docx');
+          await openAsNativeDocx(buffer, file.name);
         } else if (lower.endsWith('.pdf')) {
           setPendingPdf(file);
         } else if (lower.endsWith('.doc')) {
-          setBusyMessage('正在读取 .doc 文件（仅提取文字，不含原格式）…');
           const buffer = await file.arrayBuffer();
-          const paragraphs = await extractParagraphsFromDoc(buffer);
-          loadConvertedDocument(paragraphs, file.name.replace(/\.doc$/i, '') + '.docx');
+          // Some software (and some users manually renaming files) produces
+          // a `.doc`-named file whose actual bytes are a modern OOXML/zip
+          // package — i.e. it's really a .docx wearing a .doc extension.
+          // Confirmed live: a user hit exactly this ("把后缀改成doc就读取
+          // 不了，改回docx可以读取"). Sending that through word-extractor's
+          // legacy-OLE2 path doesn't work (it's not OLE2 at all); its own
+          // zip-based `OpenOfficeExtractor` fallback technically recognizes
+          // the shape but needs real DEFLATE decompression (`zlib`), which
+          // isn't polyfilled here (and deliberately won't be — see
+          // vite.config.ts), so it fails with `createInflateRaw is not a
+          // function`. Detecting the zip signature up front and routing
+          // straight to our own native `parseDocx` sidesteps that path
+          // entirely and gives a strictly better result anyway: full
+          // formatting preserved, instead of word-extractor's plain-text-only
+          // extraction.
+          if (looksLikeZipPackage(buffer)) {
+            setBusyMessage('检测到这是一个 .docx 文档（只是文件后缀是 .doc），正在以原生方式打开…');
+            await openAsNativeDocx(buffer, file.name.replace(/\.doc$/i, '.docx'));
+          } else {
+            setBusyMessage('正在读取 .doc 文件（仅提取文字，不含原格式）…');
+            const paragraphs = await extractParagraphsFromDoc(buffer);
+            loadConvertedDocument(paragraphs, file.name.replace(/\.doc$/i, '') + '.docx');
+          }
         } else if (lower.endsWith('.hwp') || lower.endsWith('.hwpx')) {
           setBusyMessage('正在解析 HWP 文件…');
           const buffer = await file.arrayBuffer();

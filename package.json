@@ -23,10 +23,12 @@
     "jszip": "^3.10.1",
     "pdfjs-dist": "^4.10.38",
     "pptxgenjs": "^4.0.1",
+    "process": "^0.11.10",
     "react": "^19.2.7",
     "react-dom": "^19.2.7",
     "react-reader": "^2.0.15",
     "react-rnd": "^10.5.3",
+    "setimmediate": "^1.0.5",
     "word-extractor": "^1.0.4"
   },
   "devDependencies": {
