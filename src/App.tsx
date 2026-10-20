@@ -4,6 +4,7 @@ import {
   createEmptyDocument,
   type DocxEditorRef,
 } from '@eigenpal/docx-editor-react';
+import { parseDocx } from '@eigenpal/docx-editor-core/docx';
 import type { Document } from '@eigenpal/docx-editor-core/types/document';
 import type { HwpDocument } from '@rhwp/core';
 import type { Sheet } from '@fortune-sheet/core';
@@ -198,7 +199,23 @@ function App() {
     async (file: File) => {
       const lower = file.name.toLowerCase();
       try {
-        if (lower.endsWith('.pdf')) {
+        if (lower.endsWith('.docx')) {
+          // Reuses the same parser the editor library's own built-in
+          // "文件 > 打开" menu item uses internally (via its `showFileOpen`
+          // prop) — full native parsing, not a text-only conversion like
+          // the other formats below. This button is the one people
+          // actually notice; before this branch existed, picking a .docx
+          // here fell through to the "不支持这个文件类型" error below even
+          // though .docx is this app's best-supported format by far — the
+          // only way in was the easy-to-miss menu item.
+          setBusyMessage('正在打开 .docx 文档…');
+          const buffer = await file.arrayBuffer();
+          const doc = await parseDocx(buffer);
+          setInitialDocument(doc);
+          setDocumentName(file.name);
+          setEditorKey((k) => k + 1);
+          setMode('docx');
+        } else if (lower.endsWith('.pdf')) {
           setPendingPdf(file);
         } else if (lower.endsWith('.doc')) {
           setBusyMessage('正在读取 .doc 文件（仅提取文字，不含原格式）…');
@@ -451,7 +468,7 @@ function App() {
       <input
         ref={fileInputRef}
         type="file"
-        accept={`.doc,.pdf,.hwp,.hwpx,.epub,.txt,.xlsx,.xls,.csv,.pptx,${IMAGE_EXTENSIONS.join(',')}`}
+        accept={`.docx,.doc,.pdf,.hwp,.hwpx,.epub,.txt,.xlsx,.xls,.csv,.pptx,${IMAGE_EXTENSIONS.join(',')}`}
         style={{ display: 'none' }}
         onChange={handleFileInputChange}
       />
@@ -474,9 +491,9 @@ function App() {
           type="button"
           className="open-other-format-btn"
           onClick={() => fileInputRef.current?.click()}
-          title="打开 .doc / .pdf / .hwp / .hwpx / .epub / .txt / .xlsx / .pptx / 图片 文件（部分格式会转换为可编辑文档，部分仅供阅读）"
+          title="打开 .docx / .doc / .pdf / .hwp / .hwpx / .epub / .txt / .xlsx / .pptx / 图片 文件（.docx 原生编辑，部分其他格式会转换为可编辑文档，部分仅供阅读）"
         >
-          打开 DOC/PDF/HWP/EPUB/TXT/XLSX/PPTX/图片
+          打开 DOCX/DOC/PDF/HWP/EPUB/TXT/XLSX/PPTX/图片
         </button>
         <button
           type="button"
